@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,11 @@ import {
 import { useUserLocation } from '../hooks/useUserLocation';
 import { useBroadcastLocation } from '../hooks/useBroadcastLocation';
 import { useNearbyUsers } from '../hooks/useNearbyUsers';
+import { useMatchNotifications } from '../hooks/useMatchNotifications';
 import RadiusCircle from '../components/RadiusCircle';
 import NearbyUserMarkers from '../components/NearbyUserMarkers';
+import MatchPopup from '../components/MatchPopup';
+import CatchScreen from './CatchScreen';
 
 // ────────────────────────────────────────────
 // Constants
@@ -27,6 +30,7 @@ const RADIUS_METERS = 50;
 // CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
 
 // ────────────────────────────────────────────
 // Props
@@ -40,11 +44,20 @@ interface MapScreenProps {
  *
  * Shows the current user on the map with a radius circle and broadcasts
  * their location to Firestore. Listens for nearby users and renders
- * them as magenta dots.
+ * them as magenta dots. Tapping a nearby user opens the catch screen.
  */
 export default function MapScreen({ userId }: MapScreenProps) {
   const mapRef = useRef<MapRef>(null);
   const { coords, error } = useUserLocation();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  const handleUserPress = useCallback((tappedUserId: string) => {
+    setSelectedUserId(tappedUserId);
+  }, []);
+
+  const handleCatchClose = useCallback(() => {
+    setSelectedUserId(null);
+  }, []);
 
   // All hooks must be called before any early returns (Rules of Hooks)
   const userCenter: [number, number] = coords
@@ -64,11 +77,13 @@ export default function MapScreen({ userId }: MapScreenProps) {
   );
 
   // ── Firebase hooks ──
-  // Broadcast this user's location to Firestore
   useBroadcastLocation(userId, coords);
-
-  // Listen for other online users
   const nearbyUsers = useNearbyUsers(userId);
+
+  // ── Match notifications ──
+  const { pendingMatch, dismissMatch } = useMatchNotifications(userId);
+
+
 
   // ── Permission denied state ──────────────────
   if (error) {
@@ -123,7 +138,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
 
         {/* Other online users — magenta dots */}
-        <NearbyUserMarkers users={nearbyUsers} />
+        <NearbyUserMarkers users={nearbyUsers} onUserPress={handleUserPress} />
 
         {/* Current user dot — cyan with white border */}
         <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
@@ -157,6 +172,20 @@ export default function MapScreen({ userId }: MapScreenProps) {
             {nearbyUsers.length} nearby
           </Text>
         </View>
+      )}
+
+      {/* Pokemon Go-style catch screen */}
+      {selectedUserId && (
+        <CatchScreen
+          targetUserId={selectedUserId}
+          currentUserId={userId}
+          onClose={handleCatchClose}
+        />
+      )}
+
+      {/* Match notification popup */}
+      {pendingMatch && (
+        <MatchPopup onDismiss={dismissMatch} />
       )}
     </View>
   );

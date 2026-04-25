@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   collection,
-  query,
-  where,
   onSnapshot,
   type Timestamp,
 } from 'firebase/firestore';
@@ -21,8 +19,8 @@ const STALE_TIMEOUT_MS = 60_000; // 60 seconds
 /**
  * Listens for other online users' locations from Firestore in real-time.
  *
- * - Queries the `locations` collection for online users via onSnapshot
- * - Filters out the current user and stale entries
+ * - Listens to the entire `locations` collection via onSnapshot
+ * - Filters out the current user, offline users, and stale entries client-side
  * - Returns an array of NearbyUser objects
  */
 export function useNearbyUsers(currentUserId: string | null): NearbyUser[] {
@@ -31,12 +29,11 @@ export function useNearbyUsers(currentUserId: string | null): NearbyUser[] {
   useEffect(() => {
     if (!currentUserId) return;
 
-    // Query only online users
+    // Listen to ALL location documents (filter client-side for reliability)
     const locationsRef = collection(db, 'locations');
-    const q = query(locationsRef, where('isOnline', '==', true));
 
     const unsubscribe = onSnapshot(
-      q,
+      locationsRef,
       (snapshot) => {
         const now = Date.now();
         const users: NearbyUser[] = [];
@@ -46,6 +43,9 @@ export function useNearbyUsers(currentUserId: string | null): NearbyUser[] {
           if (doc.id === currentUserId) return;
 
           const data = doc.data();
+
+          // Skip offline users
+          if (data.isOnline !== true) return;
 
           // Skip stale users (no recent update)
           const lastUpdated = data.lastUpdated as Timestamp | null;
