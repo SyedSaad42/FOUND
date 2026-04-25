@@ -1,0 +1,235 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+} from 'react-native';
+
+interface StatusMessageButtonProps {
+  currentMessage: string;
+  onMessageChange: (message: string) => void;
+}
+
+/**
+ * Floating action button that opens a bottom-sheet to set a status message.
+ * The message is displayed as a speech bubble above the user's map character.
+ */
+export default function StatusMessageButton({
+  currentMessage,
+  onMessageChange,
+}: StatusMessageButtonProps) {
+  const [visible, setVisible] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const open = () => {
+    setDraft(currentMessage);
+    setVisible(true);
+  };
+
+  const confirm = () => {
+    onMessageChange(draft.trim());
+    setVisible(false);
+  };
+
+  const cancel = () => setVisible(false);
+
+  const clear = () => {
+    onMessageChange('');
+    setVisible(false);
+  };
+
+  return (
+    <>
+      <TouchableOpacity style={styles.fab} onPress={open} activeOpacity={0.8}>
+        <Text style={styles.fabIcon}>{currentMessage ? '💬' : '✏️'}</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        onRequestClose={cancel}
+      >
+        <Pressable style={styles.overlay} onPress={cancel}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.sheetWrapper}
+          >
+            <Pressable style={styles.sheet} onPress={() => {}}>
+              <View style={styles.handle} />
+              <Text style={styles.title}>Your Status</Text>
+              <Text style={styles.subtitle}>
+                Appears as a speech bubble above your character
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="e.g. Looking to connect! 👋"
+                placeholderTextColor="#444"
+                maxLength={40}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={confirm}
+                selectionColor="#00e5ff"
+              />
+              <Text style={styles.charCount}>{draft.length}/40</Text>
+
+              <View style={styles.actions}>
+                {currentMessage ? (
+                  <TouchableOpacity style={styles.clearButton} onPress={clear}>
+                    <Text style={styles.clearText}>Clear</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity style={styles.cancelButton} onPress={cancel}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.setButton, !draft.trim() && styles.setButtonDisabled]}
+                  onPress={confirm}
+                  disabled={!draft.trim()}
+                >
+                  <Text style={styles.setText}>Set</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  fab: {
+    position: 'absolute',
+    bottom: 36,
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(10, 10, 26, 0.9)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 229, 255, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#00e5ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  fabIcon: {
+    fontSize: 22,
+  },
+
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  sheetWrapper: {
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#0d0d24',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.2)',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 44,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#555',
+    fontSize: 13,
+    marginBottom: 20,
+  },
+  input: {
+    backgroundColor: '#1a1a35',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.3)',
+    color: '#ffffff',
+    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  charCount: {
+    color: '#444',
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 6,
+    marginBottom: 24,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  clearButton: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 64, 129, 0.12)',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 64, 129, 0.3)',
+  },
+  clearText: {
+    color: '#ff4081',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+  },
+  cancelText: {
+    color: '#888',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  setButton: {
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    borderRadius: 10,
+    backgroundColor: '#00e5ff',
+    alignItems: 'center',
+  },
+  setButtonDisabled: {
+    opacity: 0.35,
+  },
+  setText: {
+    color: '#0a0a1a',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+});
