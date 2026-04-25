@@ -38,6 +38,7 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
   const [height, setHeight] = useState('');
   const [email, setEmail] = useState('');
   const [avatar, setAvatar] = useState('sheep');
@@ -47,6 +48,7 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
     if (!isLoading) {
       setName(profile.name);
       setAge(profile.age);
+      setGender(profile.gender);
       setHeight(profile.height);
       setEmail(profile.email);
       setAvatar(profile.avatar);
@@ -54,7 +56,7 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
   }, [isLoading]);
 
   const handleSave = async () => {
-    await saveProfile({ name, age, height, email, avatar });
+    await saveProfile({ name, age, gender, height, email, avatar });
     onClose();
   };
 
@@ -141,6 +143,31 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
               placeholderTextColor="rgba(255,255,255,0.25)"
               keyboardType="number-pad"
             />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Gender</Text>
+            <View style={styles.genderRow}>
+              {['Male', 'Female', 'Other'].map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.genderOption,
+                    gender === option && styles.genderOptionSelected,
+                  ]}
+                  onPress={() => setGender(option)}
+                >
+                  <Text
+                    style={[
+                      styles.genderOptionText,
+                      gender === option && styles.genderOptionTextSelected,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.fieldGroup}>
@@ -287,6 +314,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
+  },
+
+  // ── Gender picker ──
+  genderRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  genderOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  genderOptionSelected: {
+    borderColor: '#00e5ff',
+    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+  },
+  genderOptionText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  genderOptionTextSelected: {
+    color: '#00e5ff',
   },
 
   // ── Form fields ──

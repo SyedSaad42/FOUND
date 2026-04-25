@@ -193,7 +193,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
         <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
 
         {/* Current user marker with status bubble */}
-        <Marker id="currentUserMarker" lngLat={userCenter}>
+        <Marker id="currentUserMarker" lngLat={userCenter} anchor="center">
           <View style={styles.userMarkerContainer}>
             {!!statusMessage && (
               <View style={styles.bubble}>
@@ -203,13 +203,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
                 <View style={styles.bubbleTail} />
               </View>
             )}
-            <View style={styles.avatarWrapper}>
-              <View style={styles.avatarGlow} />
-              <Image
-                source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
-                style={styles.userAvatarImage}
-              />
-            </View>
+            <Image
+              source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+              style={styles.userAvatarImage}
+            />
           </View>
         </Marker>
 
@@ -346,19 +343,6 @@ const styles = StyleSheet.create({
   // ── User Marker & Bubble ──
   userMarkerContainer: {
     alignItems: 'center',
-  },
-  avatarWrapper: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 26,
-    backgroundColor: 'rgba(0, 229, 255, 0.15)',
-    borderWidth: 2,
-    borderColor: 'rgba(0, 229, 255, 0.4)',
   },
   userAvatarImage: {
     width: 44,

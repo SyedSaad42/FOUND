@@ -7,6 +7,7 @@ export interface UserProfile {
   age: string;
   height: string;
   email: string;
+  gender: string;
   avatar: string;
 }
 
@@ -15,6 +16,7 @@ const DEFAULT_PROFILE: UserProfile = {
   age: '',
   height: '',
   email: '',
+  gender: '',
   avatar: 'sheep',
 };
 
@@ -43,6 +45,7 @@ export function useProfile(userId: string | null) {
             age: data.age ?? '',
             height: data.height ?? '',
             email: data.email ?? '',
+            gender: data.gender ?? '',
             avatar: data.avatar ?? 'sheep',
           });
         }
