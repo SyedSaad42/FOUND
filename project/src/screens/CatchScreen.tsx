@@ -14,12 +14,21 @@ import { db } from '../config/firebase';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const charmanderImg = require('../../assets/charmander.png');
+// Avatar image map — keys match profile.avatar values
+const AVATAR_IMAGES: Record<string, any> = {
+  sheep: require('../../assets/user-avatar.png'),
+  beaver: require('../../assets/user-avatar-beaver.png'),
+  bear: require('../../assets/user-avatar-bear.png'),
+  cat: require('../../assets/user-avatar-cat.png'),
+  pig: require('../../assets/user-avatar-pig.png'),
+  sloth: require('../../assets/user-avatar-sloth.png'),
+};
 
 interface CatchScreenProps {
   /** The tapped user's ID */
   targetUserId: string;
+  /** The tapped user's avatar key (e.g. 'sheep', 'beaver') */
+  targetAvatar: string;
   /** The current user's ID (to record who sent the catch) */
   currentUserId: string;
   /** Called when the user dismisses or completes the catch */
@@ -36,7 +45,7 @@ type CatchState = 'idle' | 'throwing' | 'catching' | 'caught';
  * - Throw animation → heart flies toward Charmander
  * - Catch animation → heart shrinks + shakes → "Caught!" message
  */
-export default function CatchScreen({ targetUserId, currentUserId, onClose }: CatchScreenProps) {
+export default function CatchScreen({ targetUserId, targetAvatar, currentUserId, onClose }: CatchScreenProps) {
   const [state, setState] = useState<CatchState>('idle');
 
   // ── Animated values ──
@@ -190,7 +199,7 @@ export default function CatchScreen({ targetUserId, currentUserId, onClose }: Ca
           },
         ]}
       >
-        <Image source={charmanderImg} style={styles.characterImage} />
+        <Image source={AVATAR_IMAGES[targetAvatar] ?? AVATAR_IMAGES.sheep} style={styles.characterImage} />
       </Animated.View>
 
       {/* Heart "pokeball" */}
