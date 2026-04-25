@@ -18,6 +18,8 @@ const THROTTLE_MS = 3000;
 export function useBroadcastLocation(
   userId: string | null,
   coords: UserCoords | null,
+  status?: string,
+  avatar?: string,
 ) {
   const lastWriteRef = useRef(0);
 
@@ -35,16 +37,22 @@ export function useBroadcastLocation(
     lastWriteRef.current = now;
 
     const docRef = doc(db, 'locations', userId);
-    setDoc(docRef, {
-      lat: coords.latitude,
-      lng: coords.longitude,
-      heading: coords.heading,
-      isOnline: true,
-      lastUpdated: serverTimestamp(),
-    }).catch((err) => {
+    setDoc(
+      docRef,
+      {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        heading: coords.heading,
+        isOnline: true,
+        status: status ?? '',
+        avatar: avatar ?? '🔥',
+        lastUpdated: serverTimestamp(),
+      },
+      { merge: true },
+    ).catch((err) => {
       console.warn('[BroadcastLocation] Write failed:', err);
     });
-  }, [userId, coords?.latitude, coords?.longitude]);
+  }, [userId, coords?.latitude, coords?.longitude, status, avatar]);
 
   // ── Handle app state changes (background/foreground) ──
   useEffect(() => {

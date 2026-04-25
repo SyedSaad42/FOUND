@@ -11,6 +11,8 @@ export interface NearbyUser {
   lat: number;
   lng: number;
   heading: number | null;
+  status?: string;
+  avatar?: string;
 }
 
 // Users who haven't updated in this long are considered stale
@@ -61,6 +63,8 @@ export function useNearbyUsers(currentUserId: string | null): NearbyUser[] {
               lat: data.lat,
               lng: data.lng,
               heading: data.heading ?? null,
+              status: data.status ?? '',
+              avatar: data.avatar ?? '🔥',
             });
           }
         });
