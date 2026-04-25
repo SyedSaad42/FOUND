@@ -23,6 +23,10 @@ interface NearbyTrackerProps {
   userLng: number;
   /** Called when the user selects someone to track */
   onTrackUser: (userId: string) => void;
+  /** Whether the panel is visible */
+  visible: boolean;
+  /** Called to close the panel */
+  onClose: () => void;
 }
 
 /**
@@ -37,53 +41,24 @@ export default function NearbyTracker({
   userLat,
   userLng,
   onTrackUser,
+  visible,
+  onClose,
 }: NearbyTrackerProps) {
-  const [expanded, setExpanded] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Pulse animation for the collapsed badge
+  // Animate panel in/out based on visible prop
   useEffect(() => {
-    if (users.length === 0 || expanded) return;
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [users.length, expanded]);
-
-  const togglePanel = () => {
-    const toExpanded = !expanded;
-    setExpanded(toExpanded);
     Animated.spring(slideAnim, {
-      toValue: toExpanded ? 1 : 0,
+      toValue: visible ? 1 : 0,
       tension: 65,
       friction: 10,
       useNativeDriver: true,
     }).start();
-  };
+  }, [visible]);
 
   const handleUserPress = (userId: string) => {
     onTrackUser(userId);
-    // Collapse panel after selection
-    setExpanded(false);
-    Animated.spring(slideAnim, {
-      toValue: 0,
-      tension: 65,
-      friction: 10,
-      useNativeDriver: true,
-    }).start();
+    onClose();
   };
 
   const panelTranslateY = slideAnim.interpolate({
@@ -96,37 +71,16 @@ export default function NearbyTracker({
 
   return (
     <>
-      {/* ── Collapsed badge (top-right) ── */}
-      {!expanded && (
-    <Animated.View
-      style={[
-        styles.badge,
-        { transform: [{ scale: pulseAnim }] },
-      ]}
-    >
-      <TouchableOpacity
-        style={styles.badgeInner}
-        onPress={togglePanel}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.badgeIcon}>🔥</Text>
-        <Text style={styles.badgeCount}>{users.length}</Text>
-        <View style={styles.badgeDivider} />
-        <Text style={styles.badgeLabel}>Nearby</Text>
-      </TouchableOpacity>
-    </Animated.View>
-  )}
-
       {/* ── Expanded panel (slide-up) ── */}
       <Animated.View
         style={[
           styles.panel,
           { transform: [{ translateY: panelTranslateY }] },
         ]}
-        pointerEvents={expanded ? 'auto' : 'none'}
+        pointerEvents={visible ? 'auto' : 'none'}
       >
         {/* Panel header */}
-        <TouchableOpacity style={styles.panelHeader} onPress={togglePanel}>
+        <TouchableOpacity style={styles.panelHeader} onPress={onClose}>
           <View style={styles.panelHandle} />
           <Text style={styles.panelTitle}>Nearby Players</Text>
           <Text style={styles.panelClose}>✕</Text>
@@ -181,11 +135,11 @@ export default function NearbyTracker({
       </Animated.View>
 
       {/* ── Backdrop when expanded ── */}
-      {expanded && (
+      {visible && (
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
-          onPress={togglePanel}
+          onPress={onClose}
         />
       )}
     </>
@@ -193,43 +147,6 @@ export default function NearbyTracker({
 }
 
 const styles = StyleSheet.create({
-  // ── Collapsed badge ──
-  badge: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
-    zIndex: 30,
-  },
-  badgeInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(20, 20, 40, 0.92)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 25,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 64, 129, 0.5)',
-    gap: 6,
-  },
-  badgeIcon: {
-    fontSize: 18,
-  },
-  badgeCount: {
-    color: '#ff4081',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  badgeDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  badgeLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
   // ── Backdrop ──
   backdrop: {
     ...StyleSheet.absoluteFillObject,

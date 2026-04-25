@@ -14,42 +14,45 @@ import {
 interface StatusMessageButtonProps {
   currentMessage: string;
   onMessageChange: (message: string) => void;
+  visible: boolean;
+  onClose: () => void;
 }
 
 /**
- * Floating action button that opens a bottom-sheet to set a status message.
+ * Bottom-sheet modal to set a status message.
  * The message is displayed as a speech bubble above the user's map character.
  */
 export default function StatusMessageButton({
   currentMessage,
   onMessageChange,
+  visible,
+  onClose,
 }: StatusMessageButtonProps) {
-  const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState('');
 
   const open = () => {
     setDraft(currentMessage);
-    setVisible(true);
   };
+
+  // Sync draft when modal opens
+  React.useEffect(() => {
+    if (visible) setDraft(currentMessage);
+  }, [visible]);
 
   const confirm = () => {
     onMessageChange(draft.trim());
-    setVisible(false);
+    onClose();
   };
 
-  const cancel = () => setVisible(false);
+  const cancel = () => onClose();
 
   const clear = () => {
     onMessageChange('');
-    setVisible(false);
+    onClose();
   };
 
   return (
     <>
-      <TouchableOpacity style={styles.fab} onPress={open} activeOpacity={0.8}>
-        <Text style={styles.fabIcon}>{currentMessage ? '💬' : '✏️'}</Text>
-      </TouchableOpacity>
-
       <Modal
         visible={visible}
         transparent
@@ -108,28 +111,6 @@ export default function StatusMessageButton({
 }
 
 const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    bottom: 36,
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(10, 10, 26, 0.9)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 229, 255, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#00e5ff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  fabIcon: {
-    fontSize: 22,
-  },
-
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
