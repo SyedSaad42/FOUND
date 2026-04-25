@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Map,
@@ -20,7 +21,7 @@ import RadiusCircle from '../components/RadiusCircle';
 import NearbyUserMarkers from '../components/NearbyUserMarkers';
 import MatchPopup from '../components/MatchPopup';
 import CatchScreen from './CatchScreen';
-
+import GuruPage from './GuruPage';
 // ────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────
@@ -50,6 +51,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const mapRef = useRef<MapRef>(null);
   const { coords, error } = useUserLocation();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [showGuruPage, setShowGuruPage] = useState(false);
 
   const handleUserPress = useCallback((tappedUserId: string) => {
     setSelectedUserId(tappedUserId);
@@ -174,6 +176,14 @@ export default function MapScreen({ userId }: MapScreenProps) {
         </View>
       )}
 
+      <TouchableOpacity
+        style={styles.guruLauncher}
+        activeOpacity={0.85}
+        onPress={() => setShowGuruPage(true)}
+      >
+        <Text style={styles.guruLauncherText}>Guru</Text>
+      </TouchableOpacity>
+
       {/* Pokemon Go-style catch screen */}
       {selectedUserId && (
         <CatchScreen
@@ -186,6 +196,21 @@ export default function MapScreen({ userId }: MapScreenProps) {
       {/* Match notification popup */}
       {pendingMatch && (
         <MatchPopup onDismiss={dismissMatch} />
+      )}
+
+      {showGuruPage && (
+        <View style={styles.guruOverlay}>
+          <View style={styles.guruOverlayHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              activeOpacity={0.8}
+              onPress={() => setShowGuruPage(false)}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <GuruPage />
+        </View>
       )}
     </View>
   );
@@ -261,5 +286,55 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  guruLauncher: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: '#ffffff',
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  guruLauncherText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  guruOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10, 14, 39, 0.95)',
+    justifyContent: 'flex-start',
+  },
+  guruOverlayHeader: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    zIndex: 2,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
   },
 });
