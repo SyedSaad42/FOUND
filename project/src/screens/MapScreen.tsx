@@ -444,7 +444,10 @@ const styles = StyleSheet.create({
 
   // ── User Marker & Bubble ──
   userMarkerContainer: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   userAvatarImage: {
     width: 44,
@@ -452,11 +455,12 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   bubble: {
+    position: 'absolute',
+    bottom: 48,
     backgroundColor: '#ffffff',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    marginBottom: 6,
     maxWidth: 120,
     elevation: 10,
     shadowColor: '#000',
