@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StatusBar, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from './src/hooks/useAuth';
 import MapScreen from './src/screens/MapScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen';
 
 // ────────────────────────────────────────────
 // App Root
 // ────────────────────────────────────────────
 export default function App() {
   const { userId, isLoading, error } = useAuth();
+  const [showWelcome, setShowWelcome] = useState(true);
 
   // ── Auth loading state ──
   if (isLoading) {
@@ -24,6 +26,15 @@ export default function App() {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>⚠️ {error ?? 'Authentication failed.'}</Text>
+      </View>
+    );
+  }
+
+  if (showWelcome) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FAF5F0" />
+        <WelcomeScreen onStart={() => setShowWelcome(false)} />
       </View>
     );
   }
