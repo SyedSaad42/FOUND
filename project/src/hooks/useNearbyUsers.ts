@@ -64,7 +64,7 @@ export function useNearbyUsers(currentUserId: string | null): NearbyUser[] {
               lng: data.lng,
               heading: data.heading ?? null,
               status: data.status ?? '',
-              avatar: data.avatar ?? '🔥',
+              avatar: data.avatar ?? 'sheep',
             });
           }
         });
