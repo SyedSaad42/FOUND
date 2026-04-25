@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
@@ -9,6 +10,7 @@ import {
 import {
   Map,
   Camera,
+  Marker,
   GeoJSONSource,
   Layer,
   type MapRef,
@@ -39,6 +41,16 @@ const TRACKING_RANGE_METERS = 1000;
 // CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
+// Avatar image map — keys match profile.avatar values
+const AVATAR_IMAGES: Record<string, any> = {
+  sheep: require('../../assets/user-avatar.png'),
+  beaver: require('../../assets/user-avatar-beaver.png'),
+  bear: require('../../assets/user-avatar-bear.png'),
+  cat: require('../../assets/user-avatar-cat.png'),
+  pig: require('../../assets/user-avatar-pig.png'),
+  sloth: require('../../assets/user-avatar-sloth.png'),
+};
 
 // ────────────────────────────────────────────
 // Props
@@ -119,18 +131,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
     }
   }, [trackedUser, trackedUserId]);
 
-  const userPointGeoJSON = useMemo(
-    () => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: userCenter,
-      },
-      properties: {},
-    }),
-    [userCenter[0], userCenter[1]],
-  );
-
   // ── Permission denied state ──────────────────
   if (error) {
     return (
@@ -180,29 +180,16 @@ export default function MapScreen({ userId }: MapScreenProps) {
         {/* Only users within the 50m radius are "catchable" dots */}
         <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
 
-        {/* Current user dot */}
-        <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
-          <Layer
-            id="userDotGlow"
-            type="circle"
-            paint={{
-              'circle-radius': 18,
-              'circle-color': 'rgba(0, 229, 255, 0.12)',
-              'circle-stroke-width': 2,
-              'circle-stroke-color': 'rgba(0, 229, 255, 0.5)',
-            }}
-          />
-          <Layer
-            id="userDotCore"
-            type="circle"
-            paint={{
-              'circle-radius': 8,
-              'circle-color': '#00e5ff',
-              'circle-stroke-width': 3,
-              'circle-stroke-color': '#ffffff',
-            }}
-          />
-        </GeoJSONSource>
+        {/* Current user avatar */}
+        <Marker lngLat={userCenter}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatarGlow} />
+            <Image
+              source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+              style={styles.avatarImage}
+            />
+          </View>
+        </Marker>
       </Map>
 
       {/* Top Profile Bar */}
@@ -211,7 +198,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
         onPress={() => setShowProfile(true)}
       >
         <View style={styles.profileAvatar}>
-          <Text style={styles.profileEmoji}>{profile.avatar}</Text>
+          <Image
+            source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+            style={styles.profileAvatarImage}
+          />
         </View>
         <Text style={styles.profileName}>{profile.name || 'Set Profile'}</Text>
       </TouchableOpacity>
@@ -311,6 +301,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  profileEmoji: { fontSize: 20 },
+  profileAvatarImage: {
+    width: 28,
+    height: 28,
+    resizeMode: 'contain',
+  },
   profileName: { color: '#fff', fontWeight: '600', fontSize: 14 },
+
+  // ── User avatar on map ──
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarGlow: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0, 229, 255, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 229, 255, 0.4)',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    resizeMode: 'contain',
+  },
 });

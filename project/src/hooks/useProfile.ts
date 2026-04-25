@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 export interface UserProfile {
@@ -29,13 +29,13 @@ export function useProfile(userId: string | null) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load profile on mount
+  // Real-time profile listener — keeps every useProfile instance in sync
   useEffect(() => {
     if (!userId) return;
 
-    const load = async () => {
-      try {
-        const snap = await getDoc(doc(db, 'profiles', userId));
+    const unsubscribe = onSnapshot(
+      doc(db, 'profiles', userId),
+      (snap) => {
         if (snap.exists()) {
           const data = snap.data();
           setProfile({
@@ -43,17 +43,18 @@ export function useProfile(userId: string | null) {
             age: data.age ?? '',
             height: data.height ?? '',
             email: data.email ?? '',
-            avatar: data.avatar ?? '🔥',
+            avatar: data.avatar ?? 'sheep',
           });
         }
-      } catch (err) {
-        console.warn('[useProfile] Load failed:', err);
-      } finally {
         setIsLoading(false);
-      }
-    };
+      },
+      (err) => {
+        console.warn('[useProfile] Listener error:', err);
+        setIsLoading(false);
+      },
+    );
 
-    load();
+    return () => unsubscribe();
   }, [userId]);
 
   const saveProfile = async (updated: UserProfile) => {
