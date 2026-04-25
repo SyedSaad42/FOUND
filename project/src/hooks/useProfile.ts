@@ -15,7 +15,7 @@ const DEFAULT_PROFILE: UserProfile = {
   age: '',
   height: '',
   email: '',
-  avatar: '🔥',
+  avatar: 'sheep',
 };
 
 /**

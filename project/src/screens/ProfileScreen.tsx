@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -12,7 +13,10 @@ import {
 } from 'react-native';
 import { useProfile, type UserProfile } from '../hooks/useProfile';
 
-const AVATAR_OPTIONS = ['🔥', '💖', '⭐', '🌸', '🐉', '🦊', '🐱', '🐶', '🦋', '🌙', '🍀', '💎'];
+const AVATAR_OPTIONS = [
+  { key: 'sheep', label: 'Sheep', image: require('../../assets/user-avatar.png') },
+  { key: 'beaver', label: 'Beaver', image: require('../../assets/user-avatar-beaver.png') },
+] as const;
 
 interface ProfileScreenProps {
   userId: string;
@@ -32,7 +36,7 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
   const [email, setEmail] = useState('');
-  const [avatar, setAvatar] = useState('🔥');
+  const [avatar, setAvatar] = useState('sheep');
 
   // Populate fields once loaded
   useEffect(() => {
@@ -87,20 +91,24 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
           {/* Avatar picker */}
           <View style={styles.avatarSection}>
             <View style={styles.currentAvatar}>
-              <Text style={styles.currentAvatarEmoji}>{avatar}</Text>
+              <Image
+                source={AVATAR_OPTIONS.find((a) => a.key === avatar)?.image ?? AVATAR_OPTIONS[0].image}
+                style={styles.currentAvatarImage}
+              />
             </View>
             <Text style={styles.avatarLabel}>Choose Avatar</Text>
             <View style={styles.avatarGrid}>
-              {AVATAR_OPTIONS.map((emoji) => (
+              {AVATAR_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={emoji}
+                  key={option.key}
                   style={[
                     styles.avatarOption,
-                    avatar === emoji && styles.avatarOptionSelected,
+                    avatar === option.key && styles.avatarOptionSelected,
                   ]}
-                  onPress={() => setAvatar(emoji)}
+                  onPress={() => setAvatar(option.key)}
                 >
-                  <Text style={styles.avatarOptionEmoji}>{emoji}</Text>
+                  <Image source={option.image} style={styles.avatarOptionImage} />
+                  <Text style={styles.avatarOptionLabel}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -233,8 +241,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  currentAvatarEmoji: {
-    fontSize: 40,
+  currentAvatarImage: {
+    width: 56,
+    height: 56,
+    resizeMode: 'contain',
   },
   avatarLabel: {
     color: 'rgba(255,255,255,0.4)',
@@ -244,26 +254,34 @@ const styles = StyleSheet.create({
   },
   avatarGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    gap: 20,
   },
   avatarOption: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 90,
+    height: 110,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: 'transparent',
+    paddingVertical: 10,
   },
   avatarOptionSelected: {
     borderColor: '#00e5ff',
     backgroundColor: 'rgba(0, 229, 255, 0.1)',
   },
-  avatarOptionEmoji: {
-    fontSize: 24,
+  avatarOptionImage: {
+    width: 56,
+    height: 56,
+    resizeMode: 'contain',
+  },
+  avatarOptionLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
   },
 
   // ── Form fields ──
