@@ -16,8 +16,11 @@ import { useUserLocation } from '../hooks/useUserLocation';
 import { useBroadcastLocation } from '../hooks/useBroadcastLocation';
 import { useNearbyUsers } from '../hooks/useNearbyUsers';
 import { useMatchNotifications } from '../hooks/useMatchNotifications';
+import { haversineDistance } from '../utils/geo';
 import RadiusCircle from '../components/RadiusCircle';
 import NearbyUserMarkers from '../components/NearbyUserMarkers';
+import NearbyTracker from '../components/NearbyTracker';
+import DirectionArrow from '../components/DirectionArrow';
 import MatchPopup from '../components/MatchPopup';
 import CatchScreen from './CatchScreen';
 
@@ -26,11 +29,11 @@ import CatchScreen from './CatchScreen';
 // ────────────────────────────────────────────
 const FOLLOW_ZOOM_LEVEL = 17;
 const RADIUS_METERS = 50;
+const TRACKER_MAX_METERS = 1000; // 1km max range for tracker
 
 // CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
 
 // ────────────────────────────────────────────
 // Props
@@ -42,14 +45,15 @@ interface MapScreenProps {
 /**
  * MapScreen — the core game-like view.
  *
- * Shows the current user on the map with a radius circle and broadcasts
- * their location to Firestore. Listens for nearby users and renders
- * them as magenta dots. Tapping a nearby user opens the catch screen.
+ * - Users within 50m appear on the map as tappable markers → catch screen
+ * - Users 50m–1km appear in the "Nearby Tracker" bar (bottom-right)
+ * - Tapping a tracked user shows a directional arrow overlay
  */
 export default function MapScreen({ userId }: MapScreenProps) {
   const mapRef = useRef<MapRef>(null);
   const { coords, error } = useUserLocation();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
 
   const handleUserPress = useCallback((tappedUserId: string) => {
     setSelectedUserId(tappedUserId);
@@ -57,6 +61,14 @@ export default function MapScreen({ userId }: MapScreenProps) {
 
   const handleCatchClose = useCallback(() => {
     setSelectedUserId(null);
+  }, []);
+
+  const handleTrackUser = useCallback((uid: string) => {
+    setTrackedUserId(uid);
+  }, []);
+
+  const handleStopTracking = useCallback(() => {
+    setTrackedUserId(null);
   }, []);
 
   // All hooks must be called before any early returns (Rules of Hooks)
@@ -78,12 +90,49 @@ export default function MapScreen({ userId }: MapScreenProps) {
 
   // ── Firebase hooks ──
   useBroadcastLocation(userId, coords);
-  const nearbyUsers = useNearbyUsers(userId);
+  const allNearbyUsers = useNearbyUsers(userId);
 
   // ── Match notifications ──
   const { pendingMatch, dismissMatch } = useMatchNotifications(userId);
 
+  // ── Split users by distance ──
+  const { withinRadius, outsideRadius } = useMemo(() => {
+    if (!coords) return { withinRadius: [], outsideRadius: [] };
 
+    const within: typeof allNearbyUsers = [];
+    const outside: Array<(typeof allNearbyUsers)[0] & { distance: number }> = [];
+
+    for (const user of allNearbyUsers) {
+      const dist = haversineDistance(
+        coords.latitude,
+        coords.longitude,
+        user.lat,
+        user.lng,
+      );
+
+      if (dist <= RADIUS_METERS) {
+        within.push(user);
+      } else if (dist <= TRACKER_MAX_METERS) {
+        outside.push({ ...user, distance: dist });
+      }
+      // Users > 1km are ignored
+    }
+
+    return { withinRadius: within, outsideRadius: outside };
+  }, [coords?.latitude, coords?.longitude, allNearbyUsers]);
+
+  // ── Find the tracked user's data (for the direction arrow) ──
+  const trackedUser = useMemo(() => {
+    if (!trackedUserId) return null;
+    return outsideRadius.find((u) => u.userId === trackedUserId) ?? null;
+  }, [trackedUserId, outsideRadius]);
+
+  // Auto-clear tracking if user enters radius or goes offline
+  const effectiveTrackedUser = trackedUser;
+  if (trackedUserId && !trackedUser) {
+    // User moved into radius or disconnected — stop tracking
+    // (Can't call setState in render, so we'll handle in a useCallback)
+  }
 
   // ── Permission denied state ──────────────────
   if (error) {
@@ -137,8 +186,8 @@ export default function MapScreen({ userId }: MapScreenProps) {
         {/* Pokemon Go-style radius circle with radiating pulse */}
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
 
-        {/* Other online users — magenta dots */}
-        <NearbyUserMarkers users={nearbyUsers} onUserPress={handleUserPress} />
+        {/* Users WITHIN radius — tappable markers on map */}
+        <NearbyUserMarkers users={withinRadius} onUserPress={handleUserPress} />
 
         {/* Current user dot — cyan with white border */}
         <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
@@ -165,13 +214,34 @@ export default function MapScreen({ userId }: MapScreenProps) {
         </GeoJSONSource>
       </Map>
 
-      {/* Online users count badge */}
-      {nearbyUsers.length > 0 && (
+      {/* Users within radius count */}
+      {withinRadius.length > 0 && (
         <View style={styles.userCountBadge}>
           <Text style={styles.userCountText}>
-            {nearbyUsers.length} nearby
+            {withinRadius.length} in range
           </Text>
         </View>
+      )}
+
+      {/* Pokemon Go-style nearby tracker (bottom-right) */}
+      <NearbyTracker
+        users={outsideRadius}
+        userLat={coords.latitude}
+        userLng={coords.longitude}
+        onTrackUser={handleTrackUser}
+      />
+
+      {/* Directional arrow overlay */}
+      {effectiveTrackedUser && coords && (
+        <DirectionArrow
+          userLat={coords.latitude}
+          userLng={coords.longitude}
+          userHeading={coords.heading}
+          targetLat={effectiveTrackedUser.lat}
+          targetLng={effectiveTrackedUser.lng}
+          distance={effectiveTrackedUser.distance}
+          onDismiss={handleStopTracking}
+        />
       )}
 
       {/* Pokemon Go-style catch screen */}
@@ -247,7 +317,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // ── Nearby users badge ──
+  // ── In-range users badge ──
   userCountBadge: {
     position: 'absolute',
     top: 50,
