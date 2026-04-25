@@ -40,6 +40,12 @@ const TRACKER_MAX_METERS = 1000; // 1km max range for tracker
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
+// Avatar image map — keys match profile.avatar values
+const AVATAR_IMAGES: Record<string, any> = {
+  sheep: require('../../assets/user-avatar.png'),
+  beaver: require('../../assets/user-avatar-beaver.png'),
+};
+
 // ────────────────────────────────────────────
 // Props
 // ────────────────────────────────────────────
@@ -191,7 +197,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
           <View style={styles.avatarContainer}>
             <View style={styles.avatarGlow} />
             <Image
-              source={require('../../assets/user-avatar.png')}
+              source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
               style={styles.avatarImage}
             />
           </View>
@@ -222,7 +228,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
           activeOpacity={0.8}
           onPress={() => setShowProfile(true)}
         >
-          <Text style={styles.profileBtnEmoji}>{profile.avatar}</Text>
+          <Image
+            source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+            style={styles.profileBtnImage}
+          />
         </TouchableOpacity>
       </View>
 
@@ -358,8 +367,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-  profileBtnEmoji: {
-    fontSize: 28,
+  profileBtnImage: {
+    width: 36,
+    height: 36,
+    resizeMode: 'contain',
   },
 
   // ── User avatar on map ──
