@@ -16,6 +16,10 @@ import { useProfile, type UserProfile } from '../hooks/useProfile';
 const AVATAR_OPTIONS = [
   { key: 'sheep', label: 'Sheep', image: require('../../assets/user-avatar.png') },
   { key: 'beaver', label: 'Beaver', image: require('../../assets/user-avatar-beaver.png') },
+  { key: 'bear', label: 'Bear', image: require('../../assets/user-avatar-bear.png') },
+  { key: 'cat', label: 'Cat', image: require('../../assets/user-avatar-cat.png') },
+  { key: 'pig', label: 'Pig', image: require('../../assets/user-avatar-pig.png') },
+  { key: 'sloth', label: 'Sloth', image: require('../../assets/user-avatar-sloth.png') },
 ] as const;
 
 interface ProfileScreenProps {
@@ -254,8 +258,9 @@ const styles = StyleSheet.create({
   },
   avatarGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 20,
+    gap: 12,
   },
   avatarOption: {
     width: 90,

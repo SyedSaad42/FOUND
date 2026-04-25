@@ -45,7 +45,7 @@ export function useBroadcastLocation(
         heading: coords.heading,
         isOnline: true,
         status: status ?? '',
-        avatar: avatar ?? '🔥',
+        avatar: avatar ?? 'sheep',
         lastUpdated: serverTimestamp(),
       },
       { merge: true },
