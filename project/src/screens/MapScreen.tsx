@@ -2,7 +2,6 @@ import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
@@ -10,9 +9,9 @@ import {
 import {
   Map,
   Camera,
-  Marker,
   GeoJSONSource,
   Layer,
+  Marker,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 import { useUserLocation } from '../hooks/useUserLocation';
@@ -41,16 +40,6 @@ const TRACKING_RANGE_METERS = 1000;
 // CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
-// Avatar image map — keys match profile.avatar values
-const AVATAR_IMAGES: Record<string, any> = {
-  sheep: require('../../assets/user-avatar.png'),
-  beaver: require('../../assets/user-avatar-beaver.png'),
-  bear: require('../../assets/user-avatar-bear.png'),
-  cat: require('../../assets/user-avatar-cat.png'),
-  pig: require('../../assets/user-avatar-pig.png'),
-  sloth: require('../../assets/user-avatar-sloth.png'),
-};
 
 // ────────────────────────────────────────────
 // Props
@@ -131,6 +120,18 @@ export default function MapScreen({ userId }: MapScreenProps) {
     }
   }, [trackedUser, trackedUserId]);
 
+  const userPointGeoJSON = useMemo(
+    () => ({
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: userCenter,
+      },
+      properties: {},
+    }),
+    [userCenter[0], userCenter[1]],
+  );
+
   // ── Permission denied state ──────────────────
   if (error) {
     return (
@@ -180,16 +181,36 @@ export default function MapScreen({ userId }: MapScreenProps) {
         {/* Only users within the 50m radius are "catchable" dots */}
         <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
 
-        {/* Current user avatar */}
-        <Marker lngLat={userCenter}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarGlow} />
-            <Image
-              source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
-              style={styles.avatarImage}
-            />
+        {/* Current user marker with status bubble */}
+        <Marker id="currentUserMarker" lngLat={userCenter}>
+          <View style={styles.userMarkerContainer}>
+            {!!statusMessage && (
+              <View style={styles.bubble}>
+                <Text style={styles.bubbleText} numberOfLines={1}>
+                  {statusMessage}
+                </Text>
+                <View style={styles.bubbleTail} />
+              </View>
+            )}
+            <View style={styles.userDotOuter}>
+              <View style={styles.userDotInner}>
+                <Text style={styles.userAvatarEmoji}>{profile.avatar || '🔥'}</Text>
+              </View>
+            </View>
           </View>
         </Marker>
+
+        {/* Current user glow (stays as Layer for smooth movement) */}
+        <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
+          <Layer
+            id="userDotGlow"
+            type="circle"
+            paint={{
+              'circle-radius': 22,
+              'circle-color': 'rgba(0, 229, 255, 0.15)',
+            }}
+          />
+        </GeoJSONSource>
       </Map>
 
       {/* Top Profile Bar */}
@@ -198,10 +219,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
         onPress={() => setShowProfile(true)}
       >
         <View style={styles.profileAvatar}>
-          <Image
-            source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
-            style={styles.profileAvatarImage}
-          />
+          <Text style={styles.profileEmoji}>{profile.avatar}</Text>
         </View>
         <Text style={styles.profileName}>{profile.name || 'Set Profile'}</Text>
       </TouchableOpacity>
@@ -242,7 +260,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
       {selectedUserId && (
         <CatchScreen
           targetUserId={selectedUserId}
-          targetAvatar={interactionUsers.find((u) => u.userId === selectedUserId)?.avatar ?? 'sheep'}
           currentUserId={userId}
           onClose={handleCatchClose}
         />
@@ -302,32 +319,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  profileAvatarImage: {
-    width: 28,
-    height: 28,
-    resizeMode: 'contain',
-  },
+  profileEmoji: { fontSize: 20 },
   profileName: { color: '#fff', fontWeight: '600', fontSize: 14 },
 
-  // ── User avatar on map ──
-  avatarContainer: {
-    width: 56,
-    height: 56,
+  // ── User Marker & Bubble ──
+  userMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 100,
+    height: 120,
+  },
+  userDotOuter: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#00e5ff33',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 229, 255, 0.8)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarGlow: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(0, 229, 255, 0.15)',
-    borderWidth: 2,
-    borderColor: 'rgba(0, 229, 255, 0.4)',
+  userDotInner: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#00e5ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
   },
-  avatarImage: {
-    width: 44,
-    height: 44,
-    resizeMode: 'contain',
+  userAvatarEmoji: {
+    fontSize: 10,
+  },
+  bubble: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 6,
+    maxWidth: 120,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  bubbleText: {
+    color: '#0a0a1a',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  bubbleTail: {
+    position: 'absolute',
+    bottom: -8,
+    alignSelf: 'center',
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#ffffff',
   },
 });
