@@ -1,38 +1,44 @@
-import React, { useRef, useMemo, useState, useCallback } from 'react';
+import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Map,
   Camera,
   GeoJSONSource,
   Layer,
-  Marker,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { useBroadcastLocation } from '../hooks/useBroadcastLocation';
 import { useNearbyUsers } from '../hooks/useNearbyUsers';
 import { useMatchNotifications } from '../hooks/useMatchNotifications';
+import { useProfile } from '../hooks/useProfile';
+import { haversineDistance } from '../utils/geo';
+
 import RadiusCircle from '../components/RadiusCircle';
 import NearbyUserMarkers from '../components/NearbyUserMarkers';
 import MatchPopup from '../components/MatchPopup';
 import CatchScreen from './CatchScreen';
+import ProfileScreen from './ProfileScreen';
+import NearbyTracker from '../components/NearbyTracker';
 import StatusMessageButton from '../components/StatusMessageButton';
+import DirectionArrow from '../components/DirectionArrow';
 
 // ────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────
 const FOLLOW_ZOOM_LEVEL = 17;
 const RADIUS_METERS = 50;
+const TRACKING_RANGE_METERS = 1000;
 
 // CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-
 
 // ────────────────────────────────────────────
 // Props
@@ -43,17 +49,52 @@ interface MapScreenProps {
 
 /**
  * MapScreen — the core game-like view.
- *
- * Shows the current user on the map with a radius circle and broadcasts
- * their location to Firestore. Listens for nearby users and renders
- * them as magenta dots. Tapping a nearby user opens the catch screen.
  */
 export default function MapScreen({ userId }: MapScreenProps) {
   const mapRef = useRef<MapRef>(null);
-  const { coords, error } = useUserLocation();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [userMessage, setUserMessage] = useState('');
 
+  // ── States ──
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
+
+  // ── Location ──
+  const { coords, error } = useUserLocation();
+  const userCenter: [number, number] = coords
+    ? [coords.longitude, coords.latitude]
+    : [0, 0];
+
+  // ── Profile ──
+  const { profile } = useProfile(userId);
+
+  // ── Firebase hooks ──
+  useBroadcastLocation(userId, coords, statusMessage, profile.avatar);
+  const allOnlineUsers = useNearbyUsers(userId);
+
+  // ── Compute Distances & Filter ──
+  const { interactionUsers, trackerUsers } = useMemo(() => {
+    const interaction: typeof allOnlineUsers = [];
+    const tracker: Array<(typeof allOnlineUsers)[0] & { distance: number }> = [];
+
+    if (!coords) return { interactionUsers: interaction, trackerUsers: tracker };
+
+    allOnlineUsers.forEach((u) => {
+      const dist = haversineDistance(coords.latitude, coords.longitude, u.lat, u.lng);
+      if (dist <= RADIUS_METERS) {
+        interaction.push(u);
+      } else if (dist <= TRACKING_RANGE_METERS) {
+        tracker.push({ ...u, distance: dist });
+      }
+    });
+
+    return { interactionUsers: interaction, trackerUsers: tracker };
+  }, [allOnlineUsers, coords?.latitude, coords?.longitude]);
+
+  // ── Match notifications ──
+  const { pendingMatch, dismissMatch } = useMatchNotifications(userId);
+
+  // ── Handlers ──
   const handleUserPress = useCallback((tappedUserId: string) => {
     setSelectedUserId(tappedUserId);
   }, []);
@@ -62,10 +103,21 @@ export default function MapScreen({ userId }: MapScreenProps) {
     setSelectedUserId(null);
   }, []);
 
-  // All hooks must be called before any early returns (Rules of Hooks)
-  const userCenter: [number, number] = coords
-    ? [coords.longitude, coords.latitude]
-    : [0, 0];
+  const handleTrackUser = (uid: string) => {
+    setTrackedUserId(uid);
+  };
+
+  const trackedUser = useMemo(() =>
+    trackerUsers.find(u => u.userId === trackedUserId),
+    [trackerUsers, trackedUserId]
+  );
+
+  // Clear tracking if user goes out of range or offline
+  useEffect(() => {
+    if (trackedUserId && !trackedUser) {
+      setTrackedUserId(null);
+    }
+  }, [trackedUser, trackedUserId]);
 
   const userPointGeoJSON = useMemo(
     () => ({
@@ -79,15 +131,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
     [userCenter[0], userCenter[1]],
   );
 
-  // ── Firebase hooks ──
-  useBroadcastLocation(userId, coords);
-  const nearbyUsers = useNearbyUsers(userId);
-
-  // ── Match notifications ──
-  const { pendingMatch, dismissMatch } = useMatchNotifications(userId);
-
-
-
   // ── Permission denied state ──────────────────
   if (error) {
     return (
@@ -95,9 +138,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
         <Text style={styles.errorIcon}>📍</Text>
         <Text style={styles.errorTitle}>Location Required</Text>
         <Text style={styles.errorMessage}>{error}</Text>
-        <Text style={styles.errorHint}>
-          Please enable location permissions in your device settings.
-        </Text>
       </View>
     );
   }
@@ -121,9 +161,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
         logo={false}
         attribution={false}
         compass={false}
-        scaleBar={false}
       >
-        {/* Camera starts at user's location and follows with smooth animation */}
         <Camera
           initialViewState={{
             center: userCenter,
@@ -137,26 +175,12 @@ export default function MapScreen({ userId }: MapScreenProps) {
           duration={1000}
         />
 
-        {/* Pokemon Go-style radius circle with radiating pulse */}
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
 
-        {/* Speech bubble above the user's own character */}
-        {userMessage ? (
-          <Marker lngLat={userCenter}>
-            <View style={styles.bubbleContainer} pointerEvents="none">
-              <View style={styles.bubbleBox}>
-                <Text style={styles.bubbleText}>{userMessage}</Text>
-              </View>
-              <View style={styles.bubbleTail} />
-              <View style={styles.bubbleSpacer} />
-            </View>
-          </Marker>
-        ) : null}
+        {/* Only users within the 50m radius are "catchable" dots */}
+        <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
 
-        {/* Other online users — magenta dots */}
-        <NearbyUserMarkers users={nearbyUsers} onUserPress={handleUserPress} />
-
-        {/* Current user dot — cyan with white border */}
+        {/* Current user dot */}
         <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
           <Layer
             id="userDotGlow"
@@ -181,16 +205,50 @@ export default function MapScreen({ userId }: MapScreenProps) {
         </GeoJSONSource>
       </Map>
 
-      {/* Online users count badge */}
-      {nearbyUsers.length > 0 && (
-        <View style={styles.userCountBadge}>
-          <Text style={styles.userCountText}>
-            {nearbyUsers.length} nearby
-          </Text>
+      {/* Top Profile Bar */}
+      <TouchableOpacity
+        style={styles.profileTab}
+        onPress={() => setShowProfile(true)}
+      >
+        <View style={styles.profileAvatar}>
+          <Text style={styles.profileEmoji}>{profile.avatar}</Text>
         </View>
+        <Text style={styles.profileName}>{profile.name || 'Set Profile'}</Text>
+      </TouchableOpacity>
+
+      {/* Status Message Button */}
+      <StatusMessageButton
+        currentMessage={statusMessage}
+        onMessageChange={setStatusMessage}
+      />
+
+      {/* Nearby Tracker (for users 50m - 1km away) */}
+      <NearbyTracker
+        users={trackerUsers}
+        userLat={coords.latitude}
+        userLng={coords.longitude}
+        onTrackUser={handleTrackUser}
+      />
+
+      {/* Directional Arrow (when tracking someone) */}
+      {trackedUser && (
+        <DirectionArrow
+          userLat={coords.latitude}
+          userLng={coords.longitude}
+          userHeading={coords.heading}
+          targetLat={trackedUser.lat}
+          targetLng={trackedUser.lng}
+          distance={trackedUser.distance}
+          onDismiss={() => setTrackedUserId(null)}
+        />
       )}
 
-      {/* Pokemon Go-style catch screen */}
+      {/* Profile Modal */}
+      {showProfile && (
+        <ProfileScreen userId={userId} onClose={() => setShowProfile(false)} />
+      )}
+
+      {/* Catch Screen Overlay */}
       {selectedUserId && (
         <CatchScreen
           targetUserId={selectedUserId}
@@ -199,34 +257,22 @@ export default function MapScreen({ userId }: MapScreenProps) {
         />
       )}
 
-      {/* Match notification popup */}
+      {/* Match Notification Popup */}
       {pendingMatch && (
         <MatchPopup onDismiss={dismissMatch} />
       )}
-
-      {/* Status message FAB + bottom-sheet editor */}
-      <StatusMessageButton
-        currentMessage={userMessage}
-        onMessageChange={setUserMessage}
-      />
     </View>
   );
 }
 
-// ────────────────────────────────────────────
-// Styles
-// ────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a1a',
   },
-
   map: {
     flex: 1,
   },
-
-  // ── Centered fallback screens ──
   centeredContainer: {
     flex: 1,
     backgroundColor: '#0a0a1a',
@@ -234,88 +280,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
+  errorIcon: { fontSize: 48, marginBottom: 16 },
+  errorTitle: { color: '#ffffff', fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  errorMessage: { color: '#ff6b6b', fontSize: 15, textAlign: 'center' },
+  loadingText: { color: '#00e5ff', fontSize: 16, marginTop: 16 },
 
-  // ── Error state ──
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  errorMessage: {
-    color: '#ff6b6b',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  errorHint: {
-    color: '#666',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // ── Loading state ──
-  loadingText: {
-    color: '#00e5ff',
-    fontSize: 16,
-    marginTop: 16,
-    fontWeight: '500',
-    letterSpacing: 1,
-  },
-
-  // ── Speech bubble ──
-  bubbleContainer: {
-    alignItems: 'center',
-    transform: [{ translateY: -58 }],
-  },
-  bubbleBox: {
-    backgroundColor: 'rgba(10, 10, 26, 0.92)',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 229, 255, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    maxWidth: 180,
-  },
-  bubbleText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  bubbleTail: {
-    width: 10,
-    height: 10,
-    backgroundColor: 'rgba(10, 10, 26, 0.92)',
-    borderRightWidth: 1.5,
-    borderBottomWidth: 1.5,
-    borderColor: 'rgba(0, 229, 255, 0.7)',
-    transform: [{ rotate: '45deg' }],
-    marginTop: -6,
-  },
-  bubbleSpacer: {
-    height: 18,
-  },
-
-  // ── Nearby users badge ──
-  userCountBadge: {
+  // Profile Tab
+  profileTab: {
     position: 'absolute',
     top: 50,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255, 64, 129, 0.85)',
-    paddingHorizontal: 16,
+    left: 16,
+    maxWidth: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 10, 26, 0.85)',
+    paddingRight: 16,
+    paddingLeft: 6,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.3)',
+    zIndex: 20,
   },
-  userCountText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
+  profileAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#00e5ff22',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
+  profileEmoji: { fontSize: 20 },
+  profileName: { color: '#fff', fontWeight: '600', fontSize: 14 },
 });

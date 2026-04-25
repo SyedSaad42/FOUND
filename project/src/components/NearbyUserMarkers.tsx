@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -32,8 +33,18 @@ export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMark
             activeOpacity={0.7}
             onPress={() => onUserPress?.(user.userId)}
           >
+            {/* Speech bubble status */}
+            {!!user.status && (
+              <View style={styles.bubble}>
+                <Text style={styles.bubbleText} numberOfLines={1}>{user.status}</Text>
+                <View style={styles.bubbleTail} />
+              </View>
+            )}
+
             <View style={styles.outerRing} />
-            <View style={styles.innerDot} />
+            <View style={styles.innerDot}>
+              <Text style={styles.avatarEmoji}>{user.avatar ?? '🔥'}</Text>
+            </View>
           </TouchableOpacity>
         </Marker>
       ))}
@@ -43,27 +54,66 @@ export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMark
 
 const styles = StyleSheet.create({
   touchArea: {
-    width: 60,
-    height: 60,
+    width: 80,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Status Bubble ──
+  bubble: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 4,
+    maxWidth: 100,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  bubbleText: {
+    color: '#0a0a1a',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bubbleTail: {
+    position: 'absolute',
+    bottom: -6,
+    alignSelf: 'center',
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#ffffff',
+  },
+
   outerRing: {
     position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 64, 129, 0.15)',
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: 'rgba(255, 64, 129, 0.6)',
   },
   innerDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#ff4081',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#ffffff',
     elevation: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarEmoji: {
+    fontSize: 14,
   },
 });
