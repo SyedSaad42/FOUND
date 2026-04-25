@@ -242,6 +242,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
       {selectedUserId && (
         <CatchScreen
           targetUserId={selectedUserId}
+          targetAvatar={interactionUsers.find((u) => u.userId === selectedUserId)?.avatar ?? 'sheep'}
           currentUserId={userId}
           onClose={handleCatchClose}
         />
