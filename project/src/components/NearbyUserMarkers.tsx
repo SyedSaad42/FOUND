@@ -1,64 +1,69 @@
-import React, { useMemo } from 'react';
-import { GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
+import React from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
+import { Marker } from '@maplibre/maplibre-react-native';
 import type { NearbyUser } from '../hooks/useNearbyUsers';
 
 interface NearbyUserMarkersProps {
   users: NearbyUser[];
+  onUserPress?: (userId: string) => void;
 }
 
 /**
- * Renders other users on the map as magenta/pink dots.
- *
- * Uses a single GeoJSONSource with a FeatureCollection containing all
- * nearby users, rendered as native CircleLayers for performance.
- * Styled in magenta to distinguish from the current user's cyan dot.
+ * Renders each nearby user as an individual Marker with a tappable
+ * magenta dot. Uses Marker components (not CircleLayers) so that
+ * each user dot is a native pressable React Native view.
  */
-export default function NearbyUserMarkers({ users }: NearbyUserMarkersProps) {
-  // Build a GeoJSON FeatureCollection from all nearby users
-  const geoJSON = useMemo(
-    () => ({
-      type: 'FeatureCollection' as const,
-      features: users.map((user) => ({
-        type: 'Feature' as const,
-        id: user.userId,
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [user.lng, user.lat],
-        },
-        properties: {
-          userId: user.userId,
-        },
-      })),
-    }),
-    [users],
-  );
-
+export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMarkersProps) {
   if (users.length === 0) return null;
 
   return (
-    <GeoJSONSource id="nearbyUsersSource" data={geoJSON}>
-      {/* Outer glow ring — magenta */}
-      <Layer
-        id="nearbyUsersGlow"
-        type="circle"
-        paint={{
-          'circle-radius': 14,
-          'circle-color': 'rgba(255, 64, 129, 0.12)',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(255, 64, 129, 0.5)',
-        }}
-      />
-      {/* Inner solid dot — magenta with white border */}
-      <Layer
-        id="nearbyUsersDot"
-        type="circle"
-        paint={{
-          'circle-radius': 7,
-          'circle-color': '#ff4081',
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': '#ffffff',
-        }}
-      />
-    </GeoJSONSource>
+    <>
+      {users.map((user) => (
+        <Marker
+          key={user.userId}
+          lngLat={[user.lng, user.lat]}
+        >
+          <TouchableOpacity
+            style={styles.touchArea}
+            activeOpacity={0.7}
+            onPress={() => onUserPress?.(user.userId)}
+          >
+            <View style={styles.outerRing} />
+            <View style={styles.innerDot} />
+          </TouchableOpacity>
+        </Marker>
+      ))}
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  touchArea: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outerRing: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 64, 129, 0.15)',
+    borderWidth: 2.5,
+    borderColor: 'rgba(255, 64, 129, 0.6)',
+  },
+  innerDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ff4081',
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    elevation: 8,
+  },
+});
