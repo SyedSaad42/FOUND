@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Marker } from '@maplibre/maplibre-react-native';
 import type { NearbyUser } from '../hooks/useNearbyUsers';
+import { playMessageInVoice } from '../utils/tts';
 
 interface NearbyUserMarkersProps {
   users: NearbyUser[];
@@ -21,6 +22,13 @@ interface NearbyUserMarkersProps {
 export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMarkersProps) {
   if (users.length === 0) return null;
 
+  const handlePress = (user: NearbyUser) => {
+    if (user.status) {
+      playMessageInVoice(user.status);
+    }
+    onUserPress?.(user.userId);
+  };
+
   return (
     <>
       {users.map((user) => (
@@ -31,7 +39,7 @@ export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMark
           <TouchableOpacity
             style={styles.touchArea}
             activeOpacity={0.7}
-            onPress={() => onUserPress?.(user.userId)}
+            onPress={() => handlePress(user)}
           >
             {/* Speech bubble status */}
             {!!user.status && (

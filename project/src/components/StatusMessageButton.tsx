@@ -9,7 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
+import { playMessageInVoice } from '../utils/tts';
 
 interface StatusMessageButtonProps {
   currentMessage: string;
@@ -26,15 +28,23 @@ export default function StatusMessageButton({
 }: StatusMessageButtonProps) {
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const open = () => {
     setDraft(currentMessage);
     setVisible(true);
   };
 
-  const confirm = () => {
-    onMessageChange(draft.trim());
+  const confirm = async () => {
+    const message = draft.trim();
+    onMessageChange(message);
     setVisible(false);
+
+    if (message) {
+      setIsSpeaking(true);
+      await playMessageInVoice(message);
+      setIsSpeaking(false);
+    }
   };
 
   const cancel = () => setVisible(false);
@@ -46,8 +56,12 @@ export default function StatusMessageButton({
 
   return (
     <>
-      <TouchableOpacity style={styles.fab} onPress={open} activeOpacity={0.8}>
-        <Text style={styles.fabIcon}>{currentMessage ? '💬' : '✏️'}</Text>
+      <TouchableOpacity style={styles.fab} onPress={open} activeOpacity={0.8} disabled={isSpeaking}>
+        {isSpeaking ? (
+          <ActivityIndicator color="#00e5ff" size="small" />
+        ) : (
+          <Text style={styles.fabIcon}>{currentMessage ? '💬' : '✏️'}</Text>
+        )}
       </TouchableOpacity>
 
       <Modal
