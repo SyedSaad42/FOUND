@@ -10,6 +10,7 @@ import {
   Camera,
   GeoJSONSource,
   Layer,
+  Marker,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 import { useUserLocation } from '../hooks/useUserLocation';
@@ -20,6 +21,7 @@ import RadiusCircle from '../components/RadiusCircle';
 import NearbyUserMarkers from '../components/NearbyUserMarkers';
 import MatchPopup from '../components/MatchPopup';
 import CatchScreen from './CatchScreen';
+import StatusMessageButton from '../components/StatusMessageButton';
 
 // ────────────────────────────────────────────
 // Constants
@@ -50,6 +52,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const mapRef = useRef<MapRef>(null);
   const { coords, error } = useUserLocation();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userMessage, setUserMessage] = useState('');
 
   const handleUserPress = useCallback((tappedUserId: string) => {
     setSelectedUserId(tappedUserId);
@@ -137,6 +140,19 @@ export default function MapScreen({ userId }: MapScreenProps) {
         {/* Pokemon Go-style radius circle with radiating pulse */}
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
 
+        {/* Speech bubble above the user's own character */}
+        {userMessage ? (
+          <Marker lngLat={userCenter}>
+            <View style={styles.bubbleContainer} pointerEvents="none">
+              <View style={styles.bubbleBox}>
+                <Text style={styles.bubbleText}>{userMessage}</Text>
+              </View>
+              <View style={styles.bubbleTail} />
+              <View style={styles.bubbleSpacer} />
+            </View>
+          </Marker>
+        ) : null}
+
         {/* Other online users — magenta dots */}
         <NearbyUserMarkers users={nearbyUsers} onUserPress={handleUserPress} />
 
@@ -187,6 +203,12 @@ export default function MapScreen({ userId }: MapScreenProps) {
       {pendingMatch && (
         <MatchPopup onDismiss={dismissMatch} />
       )}
+
+      {/* Status message FAB + bottom-sheet editor */}
+      <StatusMessageButton
+        currentMessage={userMessage}
+        onMessageChange={setUserMessage}
+      />
     </View>
   );
 }
@@ -245,6 +267,40 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontWeight: '500',
     letterSpacing: 1,
+  },
+
+  // ── Speech bubble ──
+  bubbleContainer: {
+    alignItems: 'center',
+    transform: [{ translateY: -58 }],
+  },
+  bubbleBox: {
+    backgroundColor: 'rgba(10, 10, 26, 0.92)',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 229, 255, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    maxWidth: 180,
+  },
+  bubbleText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  bubbleTail: {
+    width: 10,
+    height: 10,
+    backgroundColor: 'rgba(10, 10, 26, 0.92)',
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: 'rgba(0, 229, 255, 0.7)',
+    transform: [{ rotate: '45deg' }],
+    marginTop: -6,
+  },
+  bubbleSpacer: {
+    height: 18,
   },
 
   // ── Nearby users badge ──
