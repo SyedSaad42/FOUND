@@ -96,8 +96,8 @@ export default function NearbyTracker({
 
   return (
     <>
-  // ── Collapsed badge (top-right) ──
-  {!expanded && (
+      {/* ── Collapsed badge (top-right) ── */}
+      {!expanded && (
     <Animated.View
       style={[
         styles.badge,

@@ -11,6 +11,7 @@ import {
   Camera,
   GeoJSONSource,
   Layer,
+  Marker,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 import { useUserLocation } from '../hooks/useUserLocation';
@@ -180,26 +181,33 @@ export default function MapScreen({ userId }: MapScreenProps) {
         {/* Only users within the 50m radius are "catchable" dots */}
         <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
 
-        {/* Current user dot */}
+        {/* Current user marker with status bubble */}
+        <Marker id="currentUserMarker" lngLat={userCenter}>
+          <View style={styles.userMarkerContainer}>
+            {!!statusMessage && (
+              <View style={styles.bubble}>
+                <Text style={styles.bubbleText} numberOfLines={1}>
+                  {statusMessage}
+                </Text>
+                <View style={styles.bubbleTail} />
+              </View>
+            )}
+            <View style={styles.userDotOuter}>
+              <View style={styles.userDotInner}>
+                <Text style={styles.userAvatarEmoji}>{profile.avatar || '🔥'}</Text>
+              </View>
+            </View>
+          </View>
+        </Marker>
+
+        {/* Current user glow (stays as Layer for smooth movement) */}
         <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
           <Layer
             id="userDotGlow"
             type="circle"
             paint={{
-              'circle-radius': 18,
-              'circle-color': 'rgba(0, 229, 255, 0.12)',
-              'circle-stroke-width': 2,
-              'circle-stroke-color': 'rgba(0, 229, 255, 0.5)',
-            }}
-          />
-          <Layer
-            id="userDotCore"
-            type="circle"
-            paint={{
-              'circle-radius': 8,
-              'circle-color': '#00e5ff',
-              'circle-stroke-width': 3,
-              'circle-stroke-color': '#ffffff',
+              'circle-radius': 22,
+              'circle-color': 'rgba(0, 229, 255, 0.15)',
             }}
           />
         </GeoJSONSource>
@@ -313,4 +321,66 @@ const styles = StyleSheet.create({
   },
   profileEmoji: { fontSize: 20 },
   profileName: { color: '#fff', fontWeight: '600', fontSize: 14 },
+
+  // ── User Marker & Bubble ──
+  userMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 100,
+    height: 120,
+  },
+  userDotOuter: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#00e5ff33',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 229, 255, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userDotInner: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#00e5ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  userAvatarEmoji: {
+    fontSize: 10,
+  },
+  bubble: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 6,
+    maxWidth: 120,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  bubbleText: {
+    color: '#0a0a1a',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  bubbleTail: {
+    position: 'absolute',
+    bottom: -8,
+    alignSelf: 'center',
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#ffffff',
+  },
 });
