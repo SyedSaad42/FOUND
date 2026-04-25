@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
@@ -40,6 +41,16 @@ const TRACKING_RANGE_METERS = 1000;
 // CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
+// Avatar image map — keys match profile.avatar values
+const AVATAR_IMAGES: Record<string, any> = {
+  sheep: require('../../assets/user-avatar.png'),
+  beaver: require('../../assets/user-avatar-beaver.png'),
+  bear: require('../../assets/user-avatar-bear.png'),
+  cat: require('../../assets/user-avatar-cat.png'),
+  pig: require('../../assets/user-avatar-pig.png'),
+  sloth: require('../../assets/user-avatar-sloth.png'),
+};
 
 // ────────────────────────────────────────────
 // Props
@@ -192,10 +203,12 @@ export default function MapScreen({ userId }: MapScreenProps) {
                 <View style={styles.bubbleTail} />
               </View>
             )}
-            <View style={styles.userDotOuter}>
-              <View style={styles.userDotInner}>
-                <Text style={styles.userAvatarEmoji}>{profile.avatar || '🔥'}</Text>
-              </View>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarGlow} />
+              <Image
+                source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+                style={styles.userAvatarImage}
+              />
             </View>
           </View>
         </Marker>
@@ -219,7 +232,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
         onPress={() => setShowProfile(true)}
       >
         <View style={styles.profileAvatar}>
-          <Text style={styles.profileEmoji}>{profile.avatar}</Text>
+          <Image
+            source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+            style={styles.profileAvatarImage}
+          />
         </View>
         <Text style={styles.profileName}>{profile.name || 'Set Profile'}</Text>
       </TouchableOpacity>
@@ -260,6 +276,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
       {selectedUserId && (
         <CatchScreen
           targetUserId={selectedUserId}
+          targetAvatar={interactionUsers.find((u) => u.userId === selectedUserId)?.avatar ?? 'sheep'}
           currentUserId={userId}
           onClose={handleCatchClose}
         />
@@ -319,38 +336,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  profileEmoji: { fontSize: 20 },
+  profileAvatarImage: {
+    width: 28,
+    height: 28,
+    resizeMode: 'contain',
+  },
   profileName: { color: '#fff', fontWeight: '600', fontSize: 14 },
 
   // ── User Marker & Bubble ──
   userMarkerContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 100,
-    height: 120,
   },
-  userDotOuter: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#00e5ff33',
+  avatarWrapper: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0, 229, 255, 0.15)',
     borderWidth: 2,
-    borderColor: 'rgba(0, 229, 255, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: 'rgba(0, 229, 255, 0.4)',
   },
-  userDotInner: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#00e5ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-  },
-  userAvatarEmoji: {
-    fontSize: 10,
+  userAvatarImage: {
+    width: 44,
+    height: 44,
+    resizeMode: 'contain',
   },
   bubble: {
     backgroundColor: '#ffffff',
