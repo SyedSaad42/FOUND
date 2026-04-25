@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
@@ -9,6 +10,7 @@ import {
 import {
   Map,
   Camera,
+  Marker,
   GeoJSONSource,
   Layer,
   type MapRef,
@@ -82,18 +84,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const userCenter: [number, number] = coords
     ? [coords.longitude, coords.latitude]
     : [0, 0];
-
-  const userPointGeoJSON = useMemo(
-    () => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: userCenter,
-      },
-      properties: {},
-    }),
-    [userCenter[0], userCenter[1]],
-  );
 
   // ── Firebase hooks ──
   useBroadcastLocation(userId, coords);
@@ -196,29 +186,16 @@ export default function MapScreen({ userId }: MapScreenProps) {
         {/* Users WITHIN radius — tappable markers on map */}
         <NearbyUserMarkers users={withinRadius} onUserPress={handleUserPress} />
 
-        {/* Current user dot — cyan with white border */}
-        <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
-          <Layer
-            id="userDotGlow"
-            type="circle"
-            paint={{
-              'circle-radius': 18,
-              'circle-color': 'rgba(0, 229, 255, 0.12)',
-              'circle-stroke-width': 2,
-              'circle-stroke-color': 'rgba(0, 229, 255, 0.5)',
-            }}
-          />
-          <Layer
-            id="userDotCore"
-            type="circle"
-            paint={{
-              'circle-radius': 8,
-              'circle-color': '#00e5ff',
-              'circle-stroke-width': 3,
-              'circle-stroke-color': '#ffffff',
-            }}
-          />
-        </GeoJSONSource>
+        {/* Current user avatar */}
+        <Marker lngLat={userCenter}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatarGlow} />
+            <Image
+              source={require('../../assets/user-avatar.png')}
+              style={styles.avatarImage}
+            />
+          </View>
+        </Marker>
       </Map>
 
       {/* Users within radius count */}
@@ -383,5 +360,27 @@ const styles = StyleSheet.create({
   },
   profileBtnEmoji: {
     fontSize: 28,
+  },
+
+  // ── User avatar on map ──
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarGlow: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0, 229, 255, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 229, 255, 0.4)',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    resizeMode: 'contain',
   },
 });
