@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Map,
@@ -23,6 +24,8 @@ import NearbyTracker from '../components/NearbyTracker';
 import DirectionArrow from '../components/DirectionArrow';
 import MatchPopup from '../components/MatchPopup';
 import CatchScreen from './CatchScreen';
+import ProfileScreen from './ProfileScreen';
+import { useProfile } from '../hooks/useProfile';
 
 // ────────────────────────────────────────────
 // Constants
@@ -54,6 +57,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const { coords, error } = useUserLocation();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+
+  // Load current user's profile for the avatar button
+  const { profile } = useProfile(userId);
 
   const handleUserPress = useCallback((tappedUserId: string) => {
     setSelectedUserId(tappedUserId);
@@ -231,6 +238,17 @@ export default function MapScreen({ userId }: MapScreenProps) {
         onTrackUser={handleTrackUser}
       />
 
+      {/* Profile Button (bottom-left) */}
+      <View style={styles.profileBtnContainer}>
+        <TouchableOpacity
+          style={styles.profileBtn}
+          activeOpacity={0.8}
+          onPress={() => setShowProfile(true)}
+        >
+          <Text style={styles.profileBtnEmoji}>{profile.avatar}</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Directional arrow overlay */}
       {effectiveTrackedUser && coords && (
         <DirectionArrow
@@ -256,6 +274,14 @@ export default function MapScreen({ userId }: MapScreenProps) {
       {/* Match notification popup */}
       {pendingMatch && (
         <MatchPopup onDismiss={dismissMatch} />
+      )}
+
+      {/* Profile Edit Screen */}
+      {showProfile && (
+        <ProfileScreen
+          userId={userId}
+          onClose={() => setShowProfile(false)}
+        />
       )}
     </View>
   );
@@ -331,5 +357,31 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '600',
+  },
+
+  // ── Profile Button ──
+  profileBtnContainer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 16,
+    zIndex: 30,
+  },
+  profileBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(20, 20, 40, 0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 229, 255, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#00e5ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  profileBtnEmoji: {
+    fontSize: 28,
   },
 });
