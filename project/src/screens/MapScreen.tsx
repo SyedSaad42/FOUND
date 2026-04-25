@@ -70,6 +70,8 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const [showProfile, setShowProfile] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
+  const [showLeaveNote, setShowLeaveNote] = useState(false);
+  const [showNearby, setShowNearby] = useState(false);
 
   // ── Location ──
   const { coords, error } = useUserLocation();
@@ -223,25 +225,65 @@ export default function MapScreen({ userId }: MapScreenProps) {
         </GeoJSONSource>
       </Map>
 
-      {/* Top Profile Bar */}
-      <TouchableOpacity
-        style={styles.profileTab}
-        onPress={() => setShowProfile(true)}
-      >
-        <View style={styles.profileAvatar}>
-          <Image
-            source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
-            style={styles.profileAvatarImage}
-          />
-        </View>
-        <Text style={styles.profileName}>{profile.name || 'Set Profile'}</Text>
-      </TouchableOpacity>
+      {/* Bottom Bar */}
+      <View style={styles.bottomBar}>
+        {/* Left: Profile info */}
+        <TouchableOpacity
+          style={styles.bottomProfile}
+          activeOpacity={0.8}
+          onPress={() => setShowProfile(true)}
+        >
+          <View style={styles.bottomAvatarCircle}>
+            <Image
+              source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
+              style={styles.bottomAvatarImage}
+            />
+          </View>
+          <View style={styles.bottomProfileInfo}>
+            <Text style={styles.bottomProfileName} numberOfLines={1}>
+              {profile.name || 'Set Profile'}
+            </Text>
+            <View style={styles.bottomPillRow}>
+              {!!profile.gender && (
+                <View style={styles.bottomPill}>
+                  <Text style={styles.bottomPillText}>{profile.gender}</Text>
+                </View>
+              )}
+              {!!profile.age && (
+                <View style={styles.bottomPill}>
+                  <Text style={styles.bottomPillText}>{profile.age}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
 
-      {/* Status Message Button */}
-      <StatusMessageButton
-        currentMessage={statusMessage}
-        onMessageChange={setStatusMessage}
-      />
+        {/* Right: Action buttons */}
+        <View style={styles.bottomActions}>
+          <TouchableOpacity
+            style={styles.bottomActionBtn}
+            activeOpacity={0.7}
+            onPress={() => setShowNearby(true)}
+          >
+            <Image
+              source={require('../../assets/nearby-people.png')}
+              style={styles.bottomActionIcon}
+            />
+            <Text style={styles.bottomActionLabel}>Nearby{`\n`}people</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bottomActionBtn}
+            activeOpacity={0.7}
+            onPress={() => setShowLeaveNote(true)}
+          >
+            <Image
+              source={require('../../assets/leave-note.png')}
+              style={styles.bottomActionIcon}
+            />
+            <Text style={styles.bottomActionLabel}>Leave{`\n`}note</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Nearby Tracker (for users 50m - 1km away) */}
       <NearbyTracker
@@ -249,6 +291,16 @@ export default function MapScreen({ userId }: MapScreenProps) {
         userLat={coords.latitude}
         userLng={coords.longitude}
         onTrackUser={handleTrackUser}
+        visible={showNearby}
+        onClose={() => setShowNearby(false)}
+      />
+
+      {/* Leave Note Modal */}
+      <StatusMessageButton
+        currentMessage={statusMessage}
+        onMessageChange={setStatusMessage}
+        visible={showLeaveNote}
+        onClose={() => setShowLeaveNote(false)}
       />
 
       {/* Directional Arrow (when tracking someone) */}
@@ -307,38 +359,88 @@ const styles = StyleSheet.create({
   errorMessage: { color: '#ff6b6b', fontSize: 15, textAlign: 'center' },
   loadingText: { color: '#00e5ff', fontSize: 16, marginTop: 16 },
 
-  // Profile Tab
-  profileTab: {
+  // ── Bottom Bar ──
+  bottomBar: {
     position: 'absolute',
-    top: 50,
-    left: 16,
-    maxWidth: '45%',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(10, 10, 26, 0.85)',
-    paddingRight: 16,
-    paddingLeft: 6,
-    paddingVertical: 6,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.3)',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 36,
+    paddingTop: 12,
     zIndex: 20,
   },
-  profileAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#00e5ff22',
+  bottomProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  bottomAvatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(30, 30, 50, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     marginRight: 10,
   },
-  profileAvatarImage: {
+  bottomAvatarImage: {
+    width: 36,
+    height: 36,
+    resizeMode: 'contain',
+  },
+  bottomProfileInfo: {
+    flexShrink: 1,
+  },
+  bottomProfileName: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  bottomPillRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  bottomPill: {
+    backgroundColor: 'rgba(200, 80, 100, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  bottomPillText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  bottomActionBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 56,
+  },
+  bottomActionIcon: {
     width: 28,
     height: 28,
     resizeMode: 'contain',
+    tintColor: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 4,
   },
-  profileName: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  bottomActionLabel: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 9,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 
   // ── User Marker & Bubble ──
   userMarkerContainer: {
