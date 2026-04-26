@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StatusBar, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useFonts } from 'expo-font';
 import { useAuth } from './src/hooks/useAuth';
 import MapScreen from './src/screens/MapScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -10,9 +11,17 @@ import WelcomeScreen from './src/screens/WelcomeScreen';
 export default function App() {
   const { userId, isLoading, error } = useAuth();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [fontsLoaded] = useFonts({
+    'Unbounded': require('./assets/Unbounded-VariableFont_wght.ttf'),
+    'Unbounded-ExtraBold': require('./assets/Unbounded-ExtraBold.ttf'),
+    'Unbounded-SemiBold': require('./assets/Unbounded-SemiBold.ttf'),
+    'Unbounded-Medium': require('./assets/Unbounded-Medium.ttf'),
+    'InstrumentSerif': require('./assets/InstrumentSerif-Regular.ttf'),
+    'InstrumentSans': require('./assets/InstrumentSans-Regular.ttf'),
+  });
 
-  // ── Auth loading state ──
-  if (isLoading) {
+  // ── Font / Auth loading state ──
+  if (isLoading || !fontsLoaded) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#00e5ff" />

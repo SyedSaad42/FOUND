@@ -3,26 +3,43 @@ import {
   View,
   Text,
   Image,
+  ImageBackground,
   StyleSheet,
   Animated,
   TouchableOpacity,
   Dimensions,
   PanResponder,
 } from 'react-native';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  doc,
+  updateDoc,
+  onSnapshot,
+  serverTimestamp,
+  Timestamp,
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { useProfile } from '../hooks/useProfile';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// Avatar image map — keys match profile.avatar values
+const HEART_TIMEOUT_SECONDS = 90;
+
+// Full user avatar images
 const AVATAR_IMAGES: Record<string, any> = {
   sheep: require('../../assets/user-avatar.png'),
-  beaver: require('../../assets/user-avatar-beaver.png'),
+  hamster: require('../../assets/user-avatar-pig.png'),
   bear: require('../../assets/user-avatar-bear.png'),
   cat: require('../../assets/user-avatar-cat.png'),
-  pig: require('../../assets/user-avatar-pig.png'),
+  platypus: require('../../assets/user-avatar-beaver.png'),
   sloth: require('../../assets/user-avatar-sloth.png'),
 };
+
+const heartImg = require('../../assets/heart.png');
+const heartCircleImg = require('../../assets/heart-circle.png');
+const catchBg = require('../../assets/catchbg.png');
+const backBtnImg = require('../../assets/backbutton.png');
 
 interface CatchScreenProps {
   /** The tapped user's ID */
@@ -31,34 +48,39 @@ interface CatchScreenProps {
   targetAvatar: string;
   /** The current user's ID (to record who sent the catch) */
   currentUserId: string;
+  /** Distance to the target user in meters */
+  distance: number;
   /** Called when the user dismisses or completes the catch */
   onClose: () => void;
 }
 
-type CatchState = 'idle' | 'throwing' | 'catching' | 'caught';
+type CatchState = 'idle' | 'throwing' | 'catching' | 'caught' | 'sent';
 
 /**
- * Pokemon Go-style "catch" screen.
+ * Catch screen — swipe up a heart to "catch" a nearby user.
  *
- * - Shows a Charmander character with a gentle idle bounce
- * - A heart "ball" at the bottom that the user swipes up to throw
- * - Throw animation → heart flies toward Charmander
- * - Catch animation → heart shrinks + shakes → "Caught!" message
+ * - Warm pink background with target user's avatar
+ * - Heart image that the user swipes up to throw
+ * - On hit: heart-circle appears under avatar, then transitions to red "sent" screen
+ * - Sent screen: 90s countdown, "Back out?" button, listens for acceptance
  */
-export default function CatchScreen({ targetUserId, targetAvatar, currentUserId, onClose }: CatchScreenProps) {
+export default function CatchScreen({ targetUserId, targetAvatar, currentUserId, distance, onClose }: CatchScreenProps) {
   const [state, setState] = useState<CatchState>('idle');
+  const { profile: targetProfile } = useProfile(targetUserId);
+  const [matchId, setMatchId] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(HEART_TIMEOUT_SECONDS);
 
   // ── Animated values ──
   const heartY = useRef(new Animated.Value(0)).current;
-  const heartX = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const heartOpacity = useRef(new Animated.Value(1)).current;
   const charBounce = useRef(new Animated.Value(0)).current;
   const catchShake = useRef(new Animated.Value(0)).current;
-  const successOpacity = useRef(new Animated.Value(0)).current;
+  const circleOpacity = useRef(new Animated.Value(0)).current;
+  const caughtHeartOpacity = useRef(new Animated.Value(0)).current;
   const bgOpacity = useRef(new Animated.Value(0)).current;
 
-  // ── Fade in background ──
+  // ── Fade in ──
   useEffect(() => {
     Animated.timing(bgOpacity, {
       toValue: 1,
@@ -67,12 +89,12 @@ export default function CatchScreen({ targetUserId, targetAvatar, currentUserId,
     }).start();
   }, []);
 
-  // ── Charmander idle bounce ──
+  // ── Avatar idle bounce ──
   useEffect(() => {
     const bounce = Animated.loop(
       Animated.sequence([
         Animated.timing(charBounce, {
-          toValue: -10,
+          toValue: -8,
           duration: 1200,
           useNativeDriver: true,
         }),
@@ -87,13 +109,40 @@ export default function CatchScreen({ targetUserId, targetAvatar, currentUserId,
     return () => bounce.stop();
   }, []);
 
-  // ── Swipe-up gesture for the heart ──
+  // ── Countdown timer (active in 'sent' state) ──
+  useEffect(() => {
+    if (state !== 'sent') return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          onClose();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [state]);
+
+  // ── Listen for match status changes (acceptance / cancellation) ──
+  useEffect(() => {
+    if (!matchId) return;
+    const unsubscribe = onSnapshot(doc(db, 'matches', matchId), (snap) => {
+      const data = snap.data();
+      if (data?.status === 'accepted') {
+        onClose();
+      }
+    });
+    return () => unsubscribe();
+  }, [matchId]);
+
+  // ── Swipe-up gesture ──
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => state === 'idle',
       onMoveShouldSetPanResponder: (_, gs) => gs.dy < -10 && state === 'idle',
       onPanResponderRelease: (_, gs) => {
-        // Only trigger throw if swiped upward
         if (gs.dy < -50 && state === 'idle') {
           throwHeart();
         }
@@ -104,300 +153,430 @@ export default function CatchScreen({ targetUserId, targetAvatar, currentUserId,
   const throwHeart = () => {
     setState('throwing');
 
-    // Heart flies upward toward the Charmander
     Animated.parallel([
       Animated.timing(heartY, {
-        toValue: -SCREEN_H * 0.4,
+        toValue: -SCREEN_H * 0.35,
         duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(heartScale, {
-        toValue: 0.5,
+        toValue: 0.4,
         duration: 600,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Heart reached the Charmander — start catch sequence
       setState('catching');
       heartOpacity.setValue(0);
 
-      // Shake animation (Charmander wiggles)
+      // Shake avatar
       Animated.sequence([
-        Animated.delay(300),
+        Animated.delay(200),
         ...Array(3)
           .fill(null)
           .flatMap(() => [
             Animated.timing(catchShake, {
-              toValue: 12,
-              duration: 100,
+              toValue: 10,
+              duration: 80,
               useNativeDriver: true,
             }),
             Animated.timing(catchShake, {
-              toValue: -12,
-              duration: 100,
+              toValue: -10,
+              duration: 80,
               useNativeDriver: true,
             }),
           ]),
         Animated.timing(catchShake, {
           toValue: 0,
-          duration: 100,
+          duration: 80,
           useNativeDriver: true,
         }),
-        Animated.delay(400),
+        Animated.delay(200),
       ]).start(() => {
-        // Caught! Write match to Firestore
         setState('caught');
 
-        // Record the match so the other user gets notified
-        addDoc(collection(db, 'matches'), {
-          fromUserId: currentUserId,
-          toUserId: targetUserId,
-          createdAt: serverTimestamp(),
-        }).catch((err) => {
-          console.warn('[CatchScreen] Failed to write match:', err);
-        });
-
-        Animated.timing(successOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }).start(() => {
-          // Auto-close after a moment
-          setTimeout(onClose, 1500);
+        // Show heart-circle under avatar briefly
+        Animated.parallel([
+          Animated.timing(circleOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(caughtHeartOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          // After brief display, write match and transition to sent screen
+          setTimeout(() => {
+            addDoc(collection(db, 'matches'), {
+              fromUserId: currentUserId,
+              toUserId: targetUserId,
+              status: 'pending',
+              expiresAt: Timestamp.fromDate(
+                new Date(Date.now() + HEART_TIMEOUT_SECONDS * 1000),
+              ),
+              createdAt: serverTimestamp(),
+            })
+              .then((ref) => {
+                setMatchId(ref.id);
+                setState('sent');
+              })
+              .catch((err) => {
+                console.warn('[CatchScreen] Failed to write match:', err);
+                onClose();
+              });
+          }, 800);
         });
       });
     });
   };
 
   const handleTapThrow = () => {
-    if (state === 'idle') {
-      throwHeart();
-    }
+    if (state === 'idle') throwHeart();
   };
 
+  const handleBackOut = async () => {
+    if (matchId) {
+      try {
+        await updateDoc(doc(db, 'matches', matchId), { status: 'cancelled' });
+      } catch (err) {
+        console.warn('[CatchScreen] Failed to cancel match:', err);
+      }
+    }
+    onClose();
+  };
+
+  // ── SENT STATE: Red waiting screen ──────────────────
+  if (state === 'sent') {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    return (
+      <View style={sentStyles.overlay}>
+        <Text style={sentStyles.title}>
+          You just sent a{'\n'}heart to {targetProfile.name || 'Player'}!
+        </Text>
+        <Image source={heartImg} style={sentStyles.heartImage} />
+        <Text style={sentStyles.timerText}>
+          They have {timeString}s{'\n'}left to respond.
+        </Text>
+        <TouchableOpacity
+          style={sentStyles.backOutBtn}
+          onPress={handleBackOut}
+          activeOpacity={0.8}
+        >
+          <Text style={sentStyles.backOutText}>Back out?</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── CATCH STATES: idle / throwing / catching / caught ──
   return (
     <Animated.View style={[styles.overlay, { opacity: bgOpacity }]}>
-      {/* Close button */}
-      <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-        <Text style={styles.closeBtnText}>✕</Text>
-      </TouchableOpacity>
+      <ImageBackground source={catchBg} style={styles.bgImage} resizeMode="cover">
+        {/* Decorative circles */}
+        <View style={styles.circleTopRight} />
+        <View style={styles.circleBottomLeft} />
 
-      {/* Encounter label */}
-      <View style={styles.encounterLabel}>
-        <Text style={styles.encounterText}>A wild match appeared!</Text>
-      </View>
+        {/* Top bar: pin + distance */}
+        <View style={styles.topBar}>
+          <Text style={styles.locationPin}>📍</Text>
+          <View style={styles.distancePill}>
+            <Text style={styles.distanceText}>{Math.round(distance)}m away</Text>
+          </View>
+        </View>
 
-      {/* Charmander character */}
-      <Animated.View
-        style={[
-          styles.characterContainer,
-          {
-            transform: [
-              { translateY: charBounce },
-              { translateX: catchShake },
-            ],
-          },
-        ]}
-      >
-        <Image source={AVATAR_IMAGES[targetAvatar] ?? AVATAR_IMAGES.sheep} style={styles.characterImage} />
-      </Animated.View>
+        {/* Instruction text */}
+        {state === 'idle' && (
+          <Text style={styles.instructionText}>
+            Swipe up to{'\n'}send a heart!
+          </Text>
+        )}
 
-      {/* Heart "pokeball" */}
-      {state !== 'caught' && (
-        <Animated.View
-          style={[
-            styles.heartContainer,
-            {
+        {/* Avatar area */}
+        <View style={styles.avatarArea}>
+          <Animated.View style={[styles.heartCircleWrapper, { opacity: circleOpacity }]}>
+            <Image source={heartCircleImg} style={styles.heartCircleImage} />
+          </Animated.View>
+          <Animated.View
+            style={{
               transform: [
-                { translateY: heartY },
-                { translateX: heartX },
-                { scale: heartScale },
+                { translateY: charBounce },
+                { translateX: catchShake },
               ],
-              opacity: heartOpacity,
-            },
-          ]}
-          {...panResponder.panHandlers}
-        >
-          <TouchableOpacity onPress={handleTapThrow} activeOpacity={0.8}>
-            <Text style={styles.heartEmoji}>💖</Text>
-            {state === 'idle' && (
-              <Text style={styles.swipeHint}>Swipe up or tap!</Text>
-            )}
+            }}
+          >
+            <Image
+              source={AVATAR_IMAGES[targetAvatar] ?? AVATAR_IMAGES.sheep}
+              style={styles.avatarImage}
+            />
+          </Animated.View>
+          <Animated.View style={[styles.caughtHeart, { opacity: caughtHeartOpacity }]}>
+            <Image source={heartImg} style={styles.caughtHeartImage} />
+          </Animated.View>
+        </View>
+
+        {/* Throwable heart */}
+        {state !== 'caught' && (
+          <Animated.View
+            style={[
+              styles.heartContainer,
+              {
+                transform: [
+                  { translateY: heartY },
+                  { scale: heartScale },
+                ],
+                opacity: heartOpacity,
+              },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <TouchableOpacity onPress={handleTapThrow} activeOpacity={0.8}>
+              {state === 'idle' && (
+                <Text style={styles.swipeArrow}>↑</Text>
+              )}
+              <Image source={heartImg} style={styles.heartImage} />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Bottom bar */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity onPress={onClose} activeOpacity={0.8}>
+            <Image source={backBtnImg} style={styles.backIcon} />
           </TouchableOpacity>
-        </Animated.View>
-      )}
 
-      {/* Catch success message */}
-      <Animated.View
-        style={[styles.successContainer, { opacity: successOpacity }]}
-      >
-        <Text style={styles.successEmoji}>💕</Text>
-        <Text style={styles.successText}>It's a match!</Text>
-        <Text style={styles.successSubtext}>You caught their attention!</Text>
-      </Animated.View>
-
-      {/* Sparkle particles background */}
-      {Array.from({ length: 20 }).map((_, i) => (
-        <SparkleParticle key={i} index={i} />
-      ))}
+          <View style={styles.targetInfo}>
+            <Text style={styles.targetName}>
+              {targetProfile.name || 'Player'}
+            </Text>
+            <View style={styles.pillRow}>
+              {!!targetProfile.gender && (
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>{targetProfile.gender}</Text>
+                </View>
+              )}
+              {!!targetProfile.age && (
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>{targetProfile.age}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </ImageBackground>
     </Animated.View>
   );
 }
 
-// ── Sparkle particle component ──
-function SparkleParticle({ index }: { index: number }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-
-  const left = Math.random() * SCREEN_W;
-  const top = Math.random() * SCREEN_H * 0.7;
-  const delay = Math.random() * 3000;
-  const size = 2 + Math.random() * 4;
-
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.parallel([
-          Animated.timing(opacity, {
-            toValue: 0.8,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: -20,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(opacity, {
-            toValue: 0,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: 0,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []);
-
-  return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        left,
-        top,
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: '#ff80ab',
-        opacity,
-        transform: [{ translateY }],
-      }}
-      pointerEvents="none"
-    />
-  );
-}
-
 // ────────────────────────────────────────────
-// Styles
+// Catch screen styles
 // ────────────────────────────────────────────
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 10, 26, 0.95)',
     zIndex: 100,
+  },
+  bgImage: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
   },
 
-  closeBtn: {
+  // ── Top bar ──
+  topBar: {
     position: 'absolute',
-    top: 50,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    top: 60,
     alignItems: 'center',
-    justifyContent: 'center',
     zIndex: 110,
   },
-  closeBtnText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
+  locationPin: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  distancePill: {
+    backgroundColor: '#3B2020',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  distanceText: {
+    fontFamily: 'InstrumentSerif',
+    color: '#ffffff',
+    fontSize: 15,
   },
 
-  encounterLabel: {
+  // ── Instruction ──
+  instructionText: {
     position: 'absolute',
-    top: 100,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255, 64, 129, 0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 64, 129, 0.4)',
-  },
-  encounterText: {
-    color: '#ff80ab',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    top: SCREEN_H * 0.18,
+    fontFamily: 'Unbounded-Medium',
+    color: '#3B2020',
+    fontSize: 24,
+    textAlign: 'center',
+    lineHeight: 34,
   },
 
-  characterContainer: {
-    marginTop: -80,
+  // ── Avatar area ──
+  avatarArea: {
+    position: 'absolute',
+    top: SCREEN_H * 0.40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  characterImage: {
+  avatarImage: {
+    width: 200,
+    height: 200,
+    resizeMode: 'contain',
+  },
+  heartCircleWrapper: {
+    position: 'absolute',
+    bottom: -20,
+    alignItems: 'center',
+  },
+  heartCircleImage: {
     width: 220,
-    height: 220,
+    height: 60,
+    resizeMode: 'contain',
+  },
+  caughtHeart: {
+    position: 'absolute',
+    bottom: 10,
+    alignItems: 'center',
+  },
+  caughtHeartImage: {
+    width: 60,
+    height: 60,
     resizeMode: 'contain',
   },
 
+  // ── Throwable heart ──
   heartContainer: {
     position: 'absolute',
-    bottom: 120,
+    bottom: SCREEN_H * 0.10,
     alignItems: 'center',
   },
-  heartEmoji: {
-    fontSize: 64,
-    textAlign: 'center',
+  heartImage: {
+    width: 160,
+    height: 160,
+    resizeMode: 'contain',
   },
-  swipeHint: {
-    color: 'rgba(255, 128, 171, 0.6)',
-    fontSize: 13,
-    marginTop: 8,
+  swipeArrow: {
+    color: 'rgba(192, 57, 43, 0.5)',
+    fontSize: 30,
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: -6,
   },
 
-  successContainer: {
+  // ── Bottom bar ──
+  bottomBar: {
     position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  backIcon: {
+    width: 60,
+    height: 60,
+    resizeMode: 'contain',
+  },
+  targetInfo: {
+    alignItems: 'flex-end',
+  },
+  targetName: {
+    fontFamily: 'Unbounded-SemiBold',
+    color: '#3B2020',
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  pill: {
+    backgroundColor: '#C0392B',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  pillText: {
+    fontFamily: 'InstrumentSerif',
+    color: '#ffffff',
+    fontSize: 14,
+  },
+  circleTopRight: {
+    position: 'absolute',
+    top: -120,
+    right: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(255, 247, 236, 0.3)',
+  },
+  circleBottomLeft: {
+    position: 'absolute',
+    bottom: -140,
+    left: -120,
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    backgroundColor: 'rgba(255, 247, 236, 0.3)',
+  },
+});
+
+// ────────────────────────────────────────────
+// Sent (waiting) screen styles
+// ────────────────────────────────────────────
+const sentStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#C0392B',
+    zIndex: 100,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 40,
   },
-  successEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  successText: {
-    color: '#ff4081',
-    fontSize: 32,
+  title: {
+    color: '#ffffff',
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: 1,
+    textAlign: 'center',
+    lineHeight: 40,
+    marginBottom: 30,
   },
-  successSubtext: {
-    color: '#ff80ab',
-    fontSize: 16,
-    marginTop: 8,
-    fontWeight: '500',
+  heartImage: {
+    width: 140,
+    height: 140,
+    resizeMode: 'contain',
+    marginBottom: 30,
+  },
+  timerText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 28,
+    marginBottom: 40,
+  },
+  backOutBtn: {
+    position: 'absolute',
+    bottom: 50,
+    left: 40,
+    right: 40,
+    backgroundColor: '#2C1810',
+    paddingVertical: 18,
+    borderRadius: 30,
+    alignItems: 'center',
+  },
+  backOutText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

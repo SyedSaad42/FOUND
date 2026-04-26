@@ -15,6 +15,7 @@ import {
   Marker,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
+import * as Location from 'expo-location';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { useBroadcastLocation } from '../hooks/useBroadcastLocation';
 import { useNearbyUsers } from '../hooks/useNearbyUsers';
@@ -24,7 +25,7 @@ import { haversineDistance } from '../utils/geo';
 
 import RadiusCircle from '../components/RadiusCircle';
 import NearbyUserMarkers from '../components/NearbyUserMarkers';
-import MatchPopup from '../components/MatchPopup';
+import HeartReceivedScreen from './HeartReceivedScreen';
 import CatchScreen from './CatchScreen';
 import ProfileScreen from './ProfileScreen';
 import NearbyTracker from '../components/NearbyTracker';
@@ -42,14 +43,24 @@ const TRACKING_RANGE_METERS = 1000;
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
-// Avatar image map — keys match profile.avatar values
+// Avatar image map — keys match profile.avatar values (used for map markers)
 const AVATAR_IMAGES: Record<string, any> = {
   sheep: require('../../assets/user-avatar.png'),
-  beaver: require('../../assets/user-avatar-beaver.png'),
+  hamster: require('../../assets/user-avatar-pig.png'),
   bear: require('../../assets/user-avatar-bear.png'),
   cat: require('../../assets/user-avatar-cat.png'),
-  pig: require('../../assets/user-avatar-pig.png'),
+  platypus: require('../../assets/user-avatar-beaver.png'),
   sloth: require('../../assets/user-avatar-sloth.png'),
+};
+
+// 3D avatar images — used for profile display (bottom bar, etc.)
+const AVATAR_3D: Record<string, any> = {
+  sheep: require('../../assets/sheep.png'),
+  hamster: require('../../assets/hamster.png'),
+  bear: require('../../assets/bear.png'),
+  cat: require('../../assets/cat.png'),
+  platypus: require('../../assets/platypus.png'),
+  sloth: require('../../assets/sloth.png'),
 };
 
 // ────────────────────────────────────────────
@@ -72,6 +83,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
   const [showLeaveNote, setShowLeaveNote] = useState(false);
   const [showNearby, setShowNearby] = useState(false);
+  const [locationName, setLocationName] = useState('');
 
   // ── Location ──
   const { coords, error } = useUserLocation();
@@ -81,6 +93,29 @@ export default function MapScreen({ userId }: MapScreenProps) {
 
   // ── Profile ──
   const { profile } = useProfile(userId);
+
+  // ── Reverse geocode to get location name ──
+  useEffect(() => {
+    if (!coords) return;
+    let cancelled = false;
+    Location.reverseGeocodeAsync({
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    }).then((results) => {
+      if (cancelled || results.length === 0) return;
+      const r = results[0];
+      const parts = [
+        r.name,
+        r.street,
+        r.city,
+        r.region,
+        r.postalCode,
+        r.country,
+      ].filter(Boolean);
+      setLocationName(parts.join(', '));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [coords?.latitude, coords?.longitude]);
 
   // ── Firebase hooks ──
   useBroadcastLocation(userId, coords, statusMessage, profile.avatar);
@@ -191,10 +226,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
 
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
 
-        {/* Only users within the 50m radius are "catchable" dots */}
-        <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
+        {/* Nearby users rendered first so current user marker appears on top */}
+        <NearbyUserMarkers users={interactionUsers} userCenter={userCenter} onUserPress={handleUserPress} />
 
-        {/* Current user marker with status bubble */}
+        {/* Current user marker with status bubble + "You" label */}
         <Marker id="currentUserMarker" lngLat={userCenter} anchor="center">
           <View style={styles.userMarkerContainer}>
             {!!statusMessage && (
@@ -209,6 +244,9 @@ export default function MapScreen({ userId }: MapScreenProps) {
               source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
               style={styles.userAvatarImage}
             />
+            <View style={styles.youPill}>
+              <Text style={styles.youPillText}>You</Text>
+            </View>
           </View>
         </Marker>
 
@@ -219,27 +257,38 @@ export default function MapScreen({ userId }: MapScreenProps) {
             type="circle"
             paint={{
               'circle-radius': 22,
-              'circle-color': 'rgba(0, 229, 255, 0.15)',
+              'circle-color': 'rgba(226, 129, 123, 0.15)',
             }}
           />
         </GeoJSONSource>
       </Map>
 
+      {/* Brown tint overlay */}
+      <View style={styles.mapOverlay} pointerEvents="none" />
+
+      {/* Top location tab */}
+      {!!locationName && (
+        <View style={styles.locationTab}>
+          <Text style={styles.locationPin}>📍</Text>
+          <Text style={styles.locationText} numberOfLines={2}>
+            Currently at {locationName}
+          </Text>
+        </View>
+      )}
+
       {/* Bottom Bar */}
       <View style={styles.bottomBar}>
-        {/* Left: Profile info */}
+        {/* Left: Profile — avatar stacked above name row */}
         <TouchableOpacity
           style={styles.bottomProfile}
           activeOpacity={0.8}
           onPress={() => setShowProfile(true)}
         >
-          <View style={styles.bottomAvatarCircle}>
-            <Image
-              source={AVATAR_IMAGES[profile.avatar] ?? AVATAR_IMAGES.sheep}
-              style={styles.bottomAvatarImage}
-            />
-          </View>
-          <View style={styles.bottomProfileInfo}>
+          <Image
+            source={AVATAR_3D[profile.avatar] ?? AVATAR_3D.sheep}
+            style={styles.bottomAvatarImage}
+          />
+          <View style={styles.bottomNameRow}>
             <Text style={styles.bottomProfileName} numberOfLines={1}>
               {profile.name || 'Set Profile'}
             </Text>
@@ -258,7 +307,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
           </View>
         </TouchableOpacity>
 
-        {/* Right: Action buttons */}
+        {/* Right: Action buttons in a rounded box */}
         <View style={styles.bottomActions}>
           <TouchableOpacity
             style={styles.bottomActionBtn}
@@ -269,7 +318,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
               source={require('../../assets/nearby-people.png')}
               style={styles.bottomActionIcon}
             />
-            <Text style={styles.bottomActionLabel}>Nearby{`\n`}people</Text>
+            <Text style={styles.bottomActionLabel}>Nearby people</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomActionBtn}
@@ -280,7 +329,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
               source={require('../../assets/leave-note.png')}
               style={styles.bottomActionIcon}
             />
-            <Text style={styles.bottomActionLabel}>Leave{`\n`}note</Text>
+            <Text style={styles.bottomActionLabel}>Note</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -327,13 +376,22 @@ export default function MapScreen({ userId }: MapScreenProps) {
           targetUserId={selectedUserId}
           targetAvatar={interactionUsers.find((u) => u.userId === selectedUserId)?.avatar ?? 'sheep'}
           currentUserId={userId}
+          distance={(() => {
+            const u = interactionUsers.find((u) => u.userId === selectedUserId);
+            return u ? haversineDistance(coords.latitude, coords.longitude, u.lat, u.lng) : 0;
+          })()}
           onClose={handleCatchClose}
         />
       )}
 
-      {/* Match Notification Popup */}
+      {/* Heart Received Screen */}
       {pendingMatch && (
-        <MatchPopup onDismiss={dismissMatch} />
+        <HeartReceivedScreen
+          matchId={pendingMatch.matchId}
+          fromUserId={pendingMatch.fromUserId}
+          expiresAt={pendingMatch.expiresAt}
+          onClose={dismissMatch}
+        />
       )}
     </View>
   );
@@ -342,7 +400,12 @@ export default function MapScreen({ userId }: MapScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: '#301F1A',
+  },
+  mapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(48, 31, 26, 0.25)',
+    zIndex: 1,
   },
   map: {
     flex: 1,
@@ -374,84 +437,116 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   bottomProfile: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flex: 1,
     marginRight: 12,
   },
-  bottomAvatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(30, 30, 50, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    marginRight: 10,
-  },
   bottomAvatarImage: {
-    width: 36,
-    height: 36,
+    width: 80,
+    height: 80,
     resizeMode: 'contain',
+    marginBottom: 6,
   },
-  bottomProfileInfo: {
-    flexShrink: 1,
+  bottomNameRow: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
   },
   bottomProfileName: {
+    fontFamily: 'Unbounded-SemiBold',
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontSize: 22,
   },
   bottomPillRow: {
     flexDirection: 'row',
     gap: 6,
   },
   bottomPill: {
-    backgroundColor: 'rgba(200, 80, 100, 0.7)',
+    backgroundColor: 'rgba(189, 44, 61, 0.46)',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 10,
   },
   bottomPillText: {
+    fontFamily: 'InstrumentSans',
     color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 14,
   },
   bottomActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 18,
+    backgroundColor: 'rgba(189, 44, 61, 0.46)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   bottomActionBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 56,
   },
   bottomActionIcon: {
-    width: 28,
-    height: 28,
+    width: 22,
+    height: 22,
     resizeMode: 'contain',
-    tintColor: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 4,
+    tintColor: '#ffffff',
+    marginBottom: 2,
   },
   bottomActionLabel: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 9,
-    fontWeight: '600',
+    fontFamily: 'InstrumentSans',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
     textAlign: 'center',
   },
 
+  // ── Top Location Tab ──
+  locationTab: {
+    position: 'absolute',
+    top: 50,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(189, 44, 61, 0.46)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    maxWidth: '85%',
+    zIndex: 20,
+  },
+  locationPin: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  locationText: {
+    fontFamily: 'InstrumentSerif',
+    color: '#ffffff',
+    fontSize: 13,
+    flexShrink: 1,
+  },
+
   // ── User Marker & Bubble ──
+  youPill: {
+    backgroundColor: 'rgba(189, 44, 61, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  youPillText: {
+    fontFamily: 'InstrumentSans',
+    color: '#ffffff',
+    fontSize: 14,
+  },
   userMarkerContainer: {
-    width: 44,
-    height: 44,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },
   userAvatarImage: {
-    width: 44,
-    height: 44,
+    width: 64,
+    height: 64,
     resizeMode: 'contain',
   },
   bubble: {

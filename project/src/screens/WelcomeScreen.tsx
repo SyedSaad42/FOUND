@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 
-const heartIcon = require('../../assets/logo.png');
+const heartIcon = require('../../assets/hearticon.png');
 
 interface WelcomeScreenProps {
   onStart: () => void;
@@ -48,29 +48,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   title: {
-    fontSize: 42,
-    fontWeight: '900',
+    fontFamily: 'Unbounded-ExtraBold',
+    fontSize: 44,
     color: '#1a1a1a',
     letterSpacing: -1,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   subtitle: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#E63946',
+    fontFamily: 'InstrumentSerif',
+    fontSize: 22,
+    color: '#C0392B',
     letterSpacing: 0.3,
-    marginBottom: 40,
+    marginBottom: 30,
   },
   heartWrapper: {
-    width: 200,
-    height: 200,
+    width: 260,
+    height: 260,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 50,
   },
   heartImage: {
-    width: 180,
-    height: 180,
+    width: 250,
+    height: 250,
     resizeMode: 'contain',
   },
   startBtn: {
@@ -87,9 +87,10 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   startBtnText: {
+    fontFamily: 'Unbounded',
     color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '400',
     letterSpacing: 0.5,
   },
 });

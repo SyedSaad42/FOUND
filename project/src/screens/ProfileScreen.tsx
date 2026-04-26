@@ -14,13 +14,22 @@ import {
 import { useProfile, type UserProfile } from '../hooks/useProfile';
 
 const AVATAR_OPTIONS = [
-  { key: 'sheep', label: 'Sheep', image: require('../../assets/user-avatar.png') },
-  { key: 'beaver', label: 'Beaver', image: require('../../assets/user-avatar-beaver.png') },
-  { key: 'bear', label: 'Bear', image: require('../../assets/user-avatar-bear.png') },
-  { key: 'cat', label: 'Cat', image: require('../../assets/user-avatar-cat.png') },
-  { key: 'pig', label: 'Pig', image: require('../../assets/user-avatar-pig.png') },
-  { key: 'sloth', label: 'Sloth', image: require('../../assets/user-avatar-sloth.png') },
+  { key: 'sheep', label: 'Sheep', image: require('../../assets/sheep.png') },
+  { key: 'hamster', label: 'Hamster', image: require('../../assets/hamster.png') },
+  { key: 'bear', label: 'Bear', image: require('../../assets/bear.png') },
+  { key: 'cat', label: 'Cat', image: require('../../assets/cat.png') },
+  { key: 'platypus', label: 'Platypus', image: require('../../assets/platypus.png') },
+  { key: 'sloth', label: 'Sloth', image: require('../../assets/sloth.png') },
 ] as const;
+
+const AVATAR_FULL: Record<string, any> = {
+  sheep: require('../../assets/user-avatar.png'),
+  hamster: require('../../assets/user-avatar-pig.png'),
+  bear: require('../../assets/user-avatar-bear.png'),
+  cat: require('../../assets/user-avatar-cat.png'),
+  platypus: require('../../assets/user-avatar-beaver.png'),
+  sloth: require('../../assets/user-avatar-sloth.png'),
+};
 
 interface ProfileScreenProps {
   userId: string;
@@ -98,7 +107,7 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
           <View style={styles.avatarSection}>
             <View style={styles.currentAvatar}>
               <Image
-                source={AVATAR_OPTIONS.find((a) => a.key === avatar)?.image ?? AVATAR_OPTIONS[0].image}
+                source={AVATAR_FULL[avatar] ?? AVATAR_FULL.sheep}
                 style={styles.currentAvatarImage}
               />
             </View>
@@ -114,7 +123,6 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
                   onPress={() => setAvatar(option.key)}
                 >
                   <Image source={option.image} style={styles.avatarOptionImage} />
-                  <Text style={styles.avatarOptionLabel}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -171,17 +179,6 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Height</Text>
-            <TextInput
-              style={styles.input}
-              value={height}
-              onChangeText={setHeight}
-              placeholder="e.g. 5'10"
-              placeholderTextColor="rgba(255,255,255,0.25)"
-            />
-          </View>
-
-          <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Email</Text>
             <TextInput
               style={styles.input}
@@ -217,12 +214,10 @@ const styles = StyleSheet.create({
   },
 
   sheet: {
-    backgroundColor: '#111128',
+    backgroundColor: '#2B1A1A',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '85%',
-    borderTopWidth: 1.5,
-    borderColor: 'rgba(0, 229, 255, 0.2)',
   },
 
   // ── Header ──
@@ -233,21 +228,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   headerTitle: {
+    fontFamily: 'Unbounded-SemiBold',
     color: '#ffffff',
     fontSize: 18,
-    fontWeight: '700',
   },
   headerBtn: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'InstrumentSans',
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
   },
   saveBtn: {
-    color: '#00e5ff',
+    fontFamily: 'InstrumentSans',
+    color: '#ffffff',
+    fontSize: 16,
   },
 
   // ── Body ──
@@ -262,58 +257,52 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   currentAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0, 229, 255, 0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(0, 229, 255, 0.4)',
+    width: 100,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   currentAvatarImage: {
-    width: 56,
-    height: 56,
+    width: 90,
+    height: 90,
     resizeMode: 'contain',
   },
   avatarLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 12,
+    fontFamily: 'InstrumentSans',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    marginBottom: 14,
   },
   avatarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 12,
+    maxWidth: 264,
   },
   avatarOption: {
-    width: 90,
-    height: 110,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
-    paddingVertical: 10,
   },
   avatarOptionSelected: {
-    borderColor: '#00e5ff',
-    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+    borderColor: 'rgba(189, 44, 61, 0.6)',
+    backgroundColor: 'rgba(189, 44, 61, 0.15)',
   },
   avatarOptionImage: {
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
     resizeMode: 'contain',
   },
   avatarOptionLabel: {
     color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 6,
+    fontSize: 10,
+    marginTop: 2,
   },
 
   // ── Gender picker ──
@@ -331,16 +320,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
   },
   genderOptionSelected: {
-    borderColor: '#00e5ff',
-    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+    borderColor: 'rgba(189, 44, 61, 0.6)',
+    backgroundColor: 'rgba(189, 44, 61, 0.15)',
   },
   genderOptionText: {
+    fontFamily: 'InstrumentSans',
     color: 'rgba(255,255,255,0.4)',
     fontSize: 15,
-    fontWeight: '600',
   },
   genderOptionTextSelected: {
-    color: '#00e5ff',
+    color: '#ffffff',
   },
 
   // ── Form fields ──
@@ -348,18 +337,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   fieldLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Unbounded-SemiBold',
+    color: '#ffffff',
+    fontSize: 14,
     marginBottom: 8,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
   input: {
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    fontFamily: 'InstrumentSans',
     color: '#ffffff',
     fontSize: 16,
     borderWidth: 1,

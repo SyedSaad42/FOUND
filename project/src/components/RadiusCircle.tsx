@@ -75,7 +75,7 @@ export default function RadiusCircle({
           id="radiusFill"
           type="fill"
           paint={{
-            'fill-color': '#00e5ff',
+            'fill-color': '#E2817B',
             'fill-opacity': 0.06,
           }}
         />
@@ -84,7 +84,7 @@ export default function RadiusCircle({
           id="radiusBorder"
           type="line"
           paint={{
-            'line-color': '#00e5ff',
+            'line-color': '#E2817B',
             'line-width': 1.5,
             'line-opacity': 0.35,
           }}
@@ -99,7 +99,7 @@ export default function RadiusCircle({
             id="pulseFill"
             type="fill"
             paint={{
-              'fill-color': '#00e5ff',
+              'fill-color': '#E2817B',
               'fill-opacity': pulseFillOpacity,
             }}
           />
@@ -108,7 +108,7 @@ export default function RadiusCircle({
             id="pulseBorder"
             type="line"
             paint={{
-              'line-color': '#00e5ff',
+              'line-color': '#E2817B',
               'line-width': pulseLineWidth,
               'line-opacity': pulseLineOpacity,
               'line-blur': 4,
