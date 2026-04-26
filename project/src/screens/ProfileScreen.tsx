@@ -74,7 +74,7 @@ export default function ProfileScreen({ userId, onClose }: ProfileScreenProps) {
   // ── Google Cloud Vision API ────────────────────────────────────────
   const verifyIdWithVision = async (imageBase64: string): Promise<boolean> => {
     try {
-      const VISION_API_KEY = 'YOUR_GOOGLE_CLOUD_VISION_API_KEY';
+      const VISION_API_KEY = process.env.VISION_API_KEY;
 
       const response = await fetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${VISION_API_KEY}`,
