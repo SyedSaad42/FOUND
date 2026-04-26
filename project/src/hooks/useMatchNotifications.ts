@@ -15,7 +15,6 @@ try {
   Notifications = require('expo-notifications');
   Notifications!.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
       shouldShowBanner: true,
@@ -44,6 +43,31 @@ export interface MatchNotification {
 export function useMatchNotifications(currentUserId: string | null) {
   const [pendingMatch, setPendingMatch] = useState<MatchNotification | null>(null);
   const seenMatchIds = useRef(new Set<string>());
+
+  // ── Request permissions & set up Android channel on first mount ──
+  useEffect(() => {
+    if (!Notifications) return;
+
+    async function setupNotifications() {
+      // Android: create a notification channel (required on API 26+)
+      if (Notifications) {
+        await Notifications.setNotificationChannelAsync('matches', {
+          name: 'Matches',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 300, 150, 300],
+          sound: 'default',
+        });
+
+        // Request permission (required on Android 13+)
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('[MatchNotifications] Notification permission denied');
+        }
+      }
+    }
+
+    setupNotifications();
+  }, []);
 
   useEffect(() => {
     if (!currentUserId) return;
