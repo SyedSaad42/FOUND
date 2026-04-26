@@ -13,6 +13,7 @@ export interface NearbyUser {
   heading: number | null;
   status?: string;
   avatar?: string;
+  name?: string;
 }
 
 // Users who haven't updated in this long are considered stale
@@ -65,6 +66,7 @@ export function useNearbyUsers(currentUserId: string | null): NearbyUser[] {
               heading: data.heading ?? null,
               status: data.status ?? '',
               avatar: data.avatar ?? 'sheep',
+              name: data.name ?? '',
             });
           }
         });

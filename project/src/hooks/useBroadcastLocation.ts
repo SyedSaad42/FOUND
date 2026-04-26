@@ -20,6 +20,7 @@ export function useBroadcastLocation(
   coords: UserCoords | null,
   status?: string,
   avatar?: string,
+  name?: string,
 ) {
   const lastWriteRef = useRef(0);
 
@@ -46,13 +47,14 @@ export function useBroadcastLocation(
         isOnline: true,
         status: status ?? '',
         avatar: avatar ?? 'sheep',
+        name: name ?? '',
         lastUpdated: serverTimestamp(),
       },
       { merge: true },
     ).catch((err) => {
       console.warn('[BroadcastLocation] Write failed:', err);
     });
-  }, [userId, coords?.latitude, coords?.longitude, status, avatar]);
+  }, [userId, coords?.latitude, coords?.longitude, status, avatar, name]);
 
   // ── Handle app state changes (background/foreground) ──
   useEffect(() => {

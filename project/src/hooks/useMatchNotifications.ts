@@ -6,6 +6,7 @@ import {
   onSnapshot,
   type Timestamp,
 } from 'firebase/firestore';
+import { Vibration } from 'react-native';
 import { db } from '../config/firebase';
 
 // Lazy-load expo-notifications to avoid crash when native module is missing (Expo Go)
@@ -91,6 +92,9 @@ export function useMatchNotifications(currentUserId: string | null) {
                 // Expo Go — no native push support
               }
             }
+
+            // Haptic buzz so the user notices even without push support
+            Vibration.vibrate([0, 300, 150, 300]);
 
             setPendingMatch({
               matchId,

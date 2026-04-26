@@ -20,6 +20,7 @@ import { useUserLocation } from '../hooks/useUserLocation';
 import { useBroadcastLocation } from '../hooks/useBroadcastLocation';
 import { useNearbyUsers } from '../hooks/useNearbyUsers';
 import { useMatchNotifications } from '../hooks/useMatchNotifications';
+import { useAutoPlayNearbyStatus } from '../hooks/useAutoPlayNearbyStatus';
 import { useProfile } from '../hooks/useProfile';
 import { haversineDistance } from '../utils/geo';
 
@@ -118,7 +119,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
   }, [coords?.latitude, coords?.longitude]);
 
   // ── Firebase hooks ──
-  useBroadcastLocation(userId, coords, statusMessage, profile.avatar);
+  useBroadcastLocation(userId, coords, statusMessage, profile.avatar, profile.name);
   const allOnlineUsers = useNearbyUsers(userId);
 
   // ── Compute Distances & Filter ──
@@ -142,6 +143,9 @@ export default function MapScreen({ userId }: MapScreenProps) {
 
   // ── Match notifications ──
   const { pendingMatch, dismissMatch } = useMatchNotifications(userId);
+
+  // ── Auto-play nearby users' status messages via TTS ──
+  useAutoPlayNearbyStatus(interactionUsers);
 
   // ── Handlers ──
   const handleUserPress = useCallback((tappedUserId: string) => {
@@ -227,7 +231,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
 
         {/* Nearby users rendered first so current user marker appears on top */}
-        <NearbyUserMarkers users={interactionUsers} userCenter={userCenter} onUserPress={handleUserPress} />
+        <NearbyUserMarkers users={interactionUsers} onUserPress={handleUserPress} />
 
         {/* Current user marker with status bubble + "You" label */}
         <Marker id="currentUserMarker" lngLat={userCenter} anchor="center">

@@ -2,12 +2,23 @@ import React from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
 import { Marker } from '@maplibre/maplibre-react-native';
 import type { NearbyUser } from '../hooks/useNearbyUsers';
 import { playMessageInVoice } from '../utils/tts';
+
+// Avatar image map — keys match profile.avatar values
+const AVATAR_IMAGES: Record<string, any> = {
+  sheep: require('../../assets/user-avatar.png'),
+  hamster: require('../../assets/user-avatar-pig.png'),
+  bear: require('../../assets/user-avatar-bear.png'),
+  cat: require('../../assets/user-avatar-cat.png'),
+  platypus: require('../../assets/user-avatar-beaver.png'),
+  sloth: require('../../assets/user-avatar-sloth.png'),
+};
 
 interface NearbyUserMarkersProps {
   users: NearbyUser[];
@@ -49,10 +60,15 @@ export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMark
               </View>
             )}
 
-            <View style={styles.outerRing} />
-            <View style={styles.innerDot}>
-              <Text style={styles.avatarEmoji}>{user.avatar ?? '🔥'}</Text>
-            </View>
+            <Image
+              source={AVATAR_IMAGES[user.avatar ?? 'sheep'] ?? AVATAR_IMAGES.sheep}
+              style={styles.avatarImage}
+            />
+            {!!user.name && (
+              <View style={styles.namePill}>
+                <Text style={styles.namePillText} numberOfLines={1}>{user.name}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </Marker>
       ))}
@@ -101,27 +117,23 @@ const styles = StyleSheet.create({
     borderTopColor: '#ffffff',
   },
 
-  outerRing: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 64, 129, 0.15)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 64, 129, 0.6)',
+  avatarImage: {
+    width: 52,
+    height: 52,
+    resizeMode: 'contain',
   },
-  innerDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#ff4081',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    elevation: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  namePill: {
+    backgroundColor: 'rgba(189, 44, 61, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  avatarEmoji: {
-    fontSize: 14,
+  namePillText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
