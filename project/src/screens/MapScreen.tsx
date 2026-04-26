@@ -5,7 +5,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Map,
   Camera,
@@ -22,36 +24,28 @@ import NearbyUserMarkers from '../components/NearbyUserMarkers';
 import MatchPopup from '../components/MatchPopup';
 import CatchScreen from './CatchScreen';
 import GuruPage from './GuruPage';
+
 // ────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────
 const FOLLOW_ZOOM_LEVEL = 17;
 const RADIUS_METERS = 50;
 
-// CARTO Dark Matter — free, no API key required
 const DARK_STYLE_URL =
   'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
-
-// ────────────────────────────────────────────
-// Props
-// ────────────────────────────────────────────
 interface MapScreenProps {
   userId: string;
 }
 
-/**
- * MapScreen — the core game-like view.
- *
- * Shows the current user on the map with a radius circle and broadcasts
- * their location to Firestore. Listens for nearby users and renders
- * them as magenta dots. Tapping a nearby user opens the catch screen.
- */
 export default function MapScreen({ userId }: MapScreenProps) {
   const mapRef = useRef<MapRef>(null);
   const { coords, error } = useUserLocation();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showGuruPage, setShowGuruPage] = useState(false);
+
+  // ── Use safe area insets so button clears home indicator / nav bar ──
+  const insets = useSafeAreaInsets();
 
   const handleUserPress = useCallback((tappedUserId: string) => {
     setSelectedUserId(tappedUserId);
@@ -61,7 +55,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
     setSelectedUserId(null);
   }, []);
 
-  // All hooks must be called before any early returns (Rules of Hooks)
   const userCenter: [number, number] = coords
     ? [coords.longitude, coords.latitude]
     : [0, 0];
@@ -78,16 +71,10 @@ export default function MapScreen({ userId }: MapScreenProps) {
     [userCenter[0], userCenter[1]],
   );
 
-  // ── Firebase hooks ──
   useBroadcastLocation(userId, coords);
   const nearbyUsers = useNearbyUsers(userId);
-
-  // ── Match notifications ──
   const { pendingMatch, dismissMatch } = useMatchNotifications(userId);
 
-
-
-  // ── Permission denied state ──────────────────
   if (error) {
     return (
       <View style={styles.centeredContainer}>
@@ -101,7 +88,6 @@ export default function MapScreen({ userId }: MapScreenProps) {
     );
   }
 
-  // ── Loading state ────────────────────────────
   if (!coords) {
     return (
       <View style={styles.centeredContainer}>
@@ -113,16 +99,17 @@ export default function MapScreen({ userId }: MapScreenProps) {
 
   return (
     <View style={styles.container}>
+
+      {/* ── Map fills the whole screen ── */}
       <Map
         ref={mapRef}
-        style={styles.map}
+        style={StyleSheet.absoluteFill}   // ← absoluteFill so overlays sit on top
         mapStyle={DARK_STYLE_URL}
         logo={false}
         attribution={false}
         compass={false}
         scaleBar={false}
       >
-        {/* Camera starts at user's location and follows with smooth animation */}
         <Camera
           initialViewState={{
             center: userCenter,
@@ -136,13 +123,9 @@ export default function MapScreen({ userId }: MapScreenProps) {
           duration={1000}
         />
 
-        {/* Pokemon Go-style radius circle with radiating pulse */}
         <RadiusCircle center={userCenter} radiusMeters={RADIUS_METERS} />
-
-        {/* Other online users — magenta dots */}
         <NearbyUserMarkers users={nearbyUsers} onUserPress={handleUserPress} />
 
-        {/* Current user dot — cyan with white border */}
         <GeoJSONSource id="userDotSource" data={userPointGeoJSON}>
           <Layer
             id="userDotGlow"
@@ -167,24 +150,33 @@ export default function MapScreen({ userId }: MapScreenProps) {
         </GeoJSONSource>
       </Map>
 
-      {/* Online users count badge */}
-      {nearbyUsers.length > 0 && (
-        <View style={styles.userCountBadge}>
-          <Text style={styles.userCountText}>
-            {nearbyUsers.length} nearby
-          </Text>
-        </View>
-      )}
+      {/* ── All overlays live in a separate pointer-events layer ──────
+          This view sits above the Map and does NOT block map gestures
+          in empty areas (pointerEvents="box-none" passes touches
+          through to the map unless a child catches them).           */}
+      <View style={styles.overlayLayer} pointerEvents="box-none">
 
-      <TouchableOpacity
-        style={styles.guruLauncher}
-        activeOpacity={0.85}
-        onPress={() => setShowGuruPage(true)}
-      >
-        <Text style={styles.guruLauncherText}>Guru</Text>
-      </TouchableOpacity>
+        {/* Nearby users count badge */}
+        {nearbyUsers.length > 0 && (
+          <View style={styles.userCountBadge}>
+            <Text style={styles.userCountText}>
+              {nearbyUsers.length} nearby
+            </Text>
+          </View>
+        )}
 
-      {/* Pokemon Go-style catch screen */}
+        {/* Guru button — always visible at bottom */}
+        <TouchableOpacity
+          style={styles.guruLauncher}
+          activeOpacity={0.75}
+          onPress={() => setShowGuruPage(true)}
+        >
+          <Text style={styles.guruLauncherText}>🧙‍♂️ Guru AI</Text>
+        </TouchableOpacity>
+
+      </View>
+
+      {/* ── Catch screen (full-screen modal-like overlay) ── */}
       {selectedUserId && (
         <CatchScreen
           targetUserId={selectedUserId}
@@ -193,14 +185,17 @@ export default function MapScreen({ userId }: MapScreenProps) {
         />
       )}
 
-      {/* Match notification popup */}
+      {/* ── Match notification popup ── */}
       {pendingMatch && (
         <MatchPopup onDismiss={dismissMatch} />
       )}
 
+      {/* ── Guru full-screen overlay ── */}
       {showGuruPage && (
         <View style={styles.guruOverlay}>
-          <View style={styles.guruOverlayHeader}>
+          <View
+            style={[styles.guruOverlayHeader, { top: insets.top + 12 }]}
+          >
             <TouchableOpacity
               style={styles.closeButton}
               activeOpacity={0.8}
@@ -225,11 +220,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a1a',
   },
 
-  map: {
-    flex: 1,
+  // ── Sits above the map, passes map gestures through in empty space ──
+  overlayLayer: {
+    ...StyleSheet.absoluteFillObject,
+    // No background — fully transparent
   },
 
-  // ── Centered fallback screens ──
   centeredContainer: {
     flex: 1,
     backgroundColor: '#0a0a1a',
@@ -238,7 +234,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
 
-  // ── Error state ──
   errorIcon: {
     fontSize: 48,
     marginBottom: 16,
@@ -263,7 +258,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // ── Loading state ──
   loadingText: {
     color: '#00e5ff',
     fontSize: 16,
@@ -272,7 +266,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // ── Nearby users badge ──
   userCountBadge: {
     position: 'absolute',
     top: 50,
@@ -287,39 +280,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+
   guruLauncher: {
     position: 'absolute',
-    top: 50,
+    bottom: 30,
     left: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderColor: '#ffffff',
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 16,
+    right: 20,
+    backgroundColor: '#FFD700',
+    borderColor: '#FFA500',
+    borderWidth: 2,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Absolutely critical for visibility above map
+    elevation: 50,
+    zIndex: 9999,
+    // iOS shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
   },
   guruLauncherText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#000',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
+
   guruOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(10, 14, 39, 0.95)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 14, 39, 0.97)',
     justifyContent: 'flex-start',
+    zIndex: 10000,
+    elevation: 25,
   },
   guruOverlayHeader: {
     position: 'absolute',
-    top: 50,
     left: 20,
     right: 20,
     zIndex: 2,

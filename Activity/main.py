@@ -1,105 +1,177 @@
+"""
+main.py — Couple Dare Cam API
+Uses Gemma 4 (gemma-4-27b-it) via Google Gemini API (AI Studio key)
+"""
+import uvicorn
 import os
-import cv2
-import textwrap
+import base64
+import json
+import logging
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
 import google.generativeai as genai
-from google.cloud import vision
 
-# Environment Setup
-GEMMA_API_KEY = os.getenv("GEMMA_API_KEY")
-VISION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+import dotenv
+dotenv.load_dotenv()
+# ─── Logging ──────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-if not all([GEMMA_API_KEY, VISION_CREDENTIALS]):
-    raise RuntimeError("Ensure GEMMA_API_KEY and GOOGLE_APPLICATION_CREDENTIALS are set.")
+# ─── Gemma 4 via Gemini API ───────────────────────────────────────────
+# Get your free key at: https://aistudio.google.com/apikey
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set.\n"
+        "Export it before starting: export GOOGLE_API_KEY=your_key_here"
+    )
 
-# Configure Clients
-genai.configure(api_key=GEMMA_API_KEY)
-gemma_model = genai.GenerativeModel("gemini-1.5-flash")
-vision_client = vision.ImageAnnotatorClient()
+# genai.configure(api_key=GOOGLE_API_KEY)
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-PERSONA_PROMPT = (
-    "You are 'Found', a witty AI lens. I will give you raw data from a vision sensor. "
-    "Your job: Interpret the scene, ignore the confidence scores, and tell the user "
-    "something interesting or funny about what they are looking at in 2 sentences."
+
+# Model: Use gemini-1.5-pro for best vision + reasoning
+# Available models: gemini-pro, gemini-1.5-pro, gemini-1.5-flash
+  
+GEMMA_MODEL = "gemini-2.5-flash"
+
+# ─── FastAPI App ──────────────────────────────────────────────────────
+app = FastAPI(title="Couple Dare Cam — Gemma 4")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-def analyze_frame_optimized(frame):
-    """One request to Cloud Vision for Labels, Objects, and Text."""
-    success, encoded_image = cv2.imencode(".jpg", frame)
-    if not success: return None
+# ─── Request / Response Models ────────────────────────────────────────
 
-    image = vision.Image(content=encoded_image.tobytes())
-    
-    # Batch request for efficiency
-    features = [
-        {"type_": vision.Feature.Type.LABEL_DETECTION},
-        {"type_": vision.Feature.Type.OBJECT_LOCALIZATION},
-        {"type_": vision.Feature.Type.TEXT_DETECTION},
-    ]
-    
-    response = vision_client.annotate_image({'image': image, 'features': features})
-    
-    return {
-        "labels": [l.description for l in response.label_annotations[:5]],
-        "objects": [obj.name for obj in response.localized_object_annotations[:5]],
-        "text": response.full_text_annotation.text.replace("\n", " ") if response.full_text_annotation else ""
-    }
+class FrameRequest(BaseModel):
+    frames: list[str]   # list of base64-encoded JPEG strings (max 4)
+    context: str = ""   # optional free-text hint from the couple
 
-def generate_response(vision_data):
-    """Synthesize raw data into a persona-driven response."""
-    raw_info = (
-        f"Labels: {', '.join(vision_data['labels'])}\n"
-        f"Objects: {', '.join(vision_data['objects'])}\n"
-        f"Text Found: {vision_data['text']}"
+class HealthResponse(BaseModel):
+    status: str
+    model: str
+
+# ─── Routes ───────────────────────────────────────────────────────────
+
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    return {"status": "ok", "model": GEMMA_MODEL}
+
+
+@app.post("/analyze-frames")
+async def analyze_frames(req: FrameRequest):
+    if not req.frames:
+        raise HTTPException(status_code=400, detail="No frames provided.")
+
+    logger.info(f"Received {len(req.frames)} frame(s). Context: '{req.context}'")
+
+    # ── Validate and decode frames ────────────────────────────────────
+    image_parts = []
+    for i, frame_b64 in enumerate(req.frames[:8]):
+        # Fix base64 padding if needed
+        missing = len(frame_b64) % 4
+        if missing:
+            frame_b64 += "=" * (4 - missing)
+
+        try:
+            raw_bytes = base64.b64decode(frame_b64, validate=True)
+        except Exception:
+            raise HTTPException(
+                status_code=422, detail=f"Frame {i} is not valid base64."
+            )
+
+        # Append as tuple: (MIME type, base64 data)
+        image_parts.append(
+            genai.protos.Part(
+                inline_data=genai.protos.Blob(
+                    mime_type="image/jpeg",
+                    data=raw_bytes
+                )
+            )
+        )
+
+    # ── Build prompt ──────────────────────────────────────────────────
+    context_line = (
+        f"Extra context from the couple: {req.context.strip()}\n"
+        if req.context.strip()
+        else ""
+    )
+
+    system_instruction = (
+        "You are a fun, playful, creative,fun and icebraking activity generator for couples. "
+        "You read the scene , understand the environment and craft personalised, cheeky but appropriate activity for the couple to do."
+    )
+
+    user_prompt = (
+    f"{context_line}"
+    "Look at these frames and quickly notice:\n"
+    "  • Where are they? (café, park, mall, street, etc.)\n"
+    "  • What objects or environment details are visible?\n\n"
+    "You are a witty wingman generating a fun, spontaneous activity for two people "
+    "who just met and are clearly into each other but still a little awkward. "
+    "The activity must:\n"
+    "  • Use the actual setting or something visible in the frames\n"
+    "  • Be completable RIGHT NOW in under 5 minutes\n"
+    "  • Create a funny or slightly embarrassing shared moment\n"
+    "  • Feel like something a bold friend dared them to do\n"
+    "  • Build a tiny bit of intimacy without being weird\n\n"
+    "Examples of the TONE (do not copy these, make your own based on the scene):\n"
+    "  • 'Ask the person nearest to you to judge whose smile is better. Loser buys the next round.'\n"
+    "  • 'You have 60 seconds to find something in this room that describes how you felt when you first saw each other. Go.'\n"
+    "  • 'Take turns doing your worst impression of each other ordering coffee. The barista votes on the winner.'\n\n"
+    "Output ONE activity in 2-2.5 sentences MAX. Be punchy, funny, and specific to what you see. "
+    "No intro, no label, no 'here is your dare'. Just the activity itself."
+)
+
+    # ── Stream response from Gemma 4 ──────────────────────────────────
+    async def stream_dare():
+        try:
+            model = genai.GenerativeModel(
+                model_name=GEMMA_MODEL,
+                system_instruction=system_instruction,
+            )
+
+            # Build content: list of image dicts + prompt text
+            # The API expects [{"mime_type": "...", "data": ...}, ..., "text prompt"]
+            content_list = image_parts + [user_prompt]
+
+            # stream=True returns a streaming GenerateContentResponse
+            response_stream = model.generate_content(
+                content_list,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.9,
+                    max_output_tokens=1000,
+                ),
+                stream=True,
+            )
+
+            for chunk in response_stream:
+                token = chunk.text if hasattr(chunk, "text") else ""
+                if token:
+                    yield f"data: {json.dumps({'text': token})}\n\n"
+
+            yield "data: [DONE]\n\n"
+
+        except Exception as e:
+            logger.error(f"Gemma 4 error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        stream_dare(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
     
-    prompt = f"{PERSONA_PROMPT}\n\nRaw Sensor Data:\n{raw_info}"
-    
-    try:
-        response = gemma_model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        return f"Gemma Error: {str(e)}"
-
-def draw_ui(frame, text):
-    """Improved UI overlay with better readability."""
-    h, w, _ = frame.shape
-    overlay = frame.copy()
-    
-    # Semi-transparent footer
-    cv2.rectangle(overlay, (0, h-150), (w, h), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-    
-    wrapped = textwrap.wrap(text, width=55)
-    y = h - 120
-    for line in wrapped[:4]:
-        cv2.putText(frame, line, (30, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-        y += 28
-    return frame
-
-def main():
-    cap = cv2.VideoCapture(0)
-    current_text = "Target locked. Press 'G' to scan."
-    
-    while True:
-        ret, frame = cap.read()
-        if not ret: break
-
-        display = draw_ui(frame.copy(), current_text)
-        cv2.imshow("Found Lens (Vision + Gemma)", display)
-
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'): break
-        if key == ord('g'):
-            current_text = "Scanning reality..."
-            cv2.imshow("Found Lens (Vision + Gemma)", draw_ui(frame.copy(), current_text))
-            cv2.waitKey(1)
-            
-            data = analyze_frame_optimized(frame)
-            if data:
-                current_text = generate_response(data)
-
-    cap.release()
-    cv2.destroyAllWindows()
-
 if __name__ == "__main__":
-    main()
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

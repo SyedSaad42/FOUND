@@ -37,14 +37,16 @@
         "ACCESS_COARSE_LOCATION",
         "FOREGROUND_SERVICE",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@maplibre/maplibre-react-native",
+      "@maplibre/maplibre-react-native","react-native-vision-camera",
       [
         "expo-location",
         {
@@ -57,9 +59,7 @@
         "projectId": "d16bd265-0708-4762-9448-221ccb6b5bb8"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/d16bd265-0708-4762-9448-221ccb6b5bb8"
     }
