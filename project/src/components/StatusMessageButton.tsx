@@ -9,7 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
+import { playMessageInVoice } from '../utils/tts';
 
 interface StatusMessageButtonProps {
   currentMessage: string;
@@ -29,6 +31,7 @@ export default function StatusMessageButton({
   onClose,
 }: StatusMessageButtonProps) {
   const [draft, setDraft] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const open = () => {
     setDraft(currentMessage);
@@ -39,9 +42,16 @@ export default function StatusMessageButton({
     if (visible) setDraft(currentMessage);
   }, [visible]);
 
-  const confirm = () => {
-    onMessageChange(draft.trim());
+  const confirm = async () => {
+    const message = draft.trim();
+    onMessageChange(message);
     onClose();
+
+    if (message) {
+      setIsSpeaking(true);
+      await playMessageInVoice(message);
+      setIsSpeaking(false);
+    }
   };
 
   const cancel = () => onClose();
