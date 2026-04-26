@@ -9,6 +9,7 @@ export interface UserProfile {
   email: string;
   gender: string;
   avatar: string;
+  idVerified?: boolean;
 }
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -18,6 +19,7 @@ const DEFAULT_PROFILE: UserProfile = {
   email: '',
   gender: '',
   avatar: 'sheep',
+  idVerified: false,
 };
 
 /**
@@ -47,6 +49,7 @@ export function useProfile(userId: string | null) {
             email: data.email ?? '',
             gender: data.gender ?? '',
             avatar: data.avatar ?? 'sheep',
+            idVerified: data.idVerified ?? false,
           });
         }
         setIsLoading(false);
