@@ -26,7 +26,7 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 // ─── Config ───────────────────────────────────────────────────────────
 // Replace with your machine's LAN IP when running FastAPI locally.
 // Example: 'http://192.168.1.42:8000'
-const API_BASE = 'http://10.43.211.109:8000';
+const API_BASE = 'http://10.85.93.109:8000';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -668,7 +668,7 @@ const handleVideoReady = async (videoPath: string) => {
               activeOpacity={1}
               style={styles.meetBtn}
             >
-              <Text style={styles.meetBtnText}>{'Meet Gemma ♥'}</Text>
+              <Text style={styles.meetBtnText}>{'Ask Gemma ♥'}</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -717,10 +717,11 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 60,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 28,
+  paddingTop: 20,
+  paddingBottom: 100,
   },
   arcOuter: {
     position: 'absolute',
@@ -759,14 +760,14 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   headline: {
-    fontFamily: 'Unbounded-Black',
-    fontSize: 34,
-    fontWeight: '900',
-    color: C.cream,
-    letterSpacing: -2,
-    lineHeight: 42,
-    textAlign: 'center',
-  },
+  fontFamily: 'Unbounded-Black',
+  fontSize: 28,        // was 34
+  fontWeight: '900',
+  color: C.cream,
+  letterSpacing: -1.5, // was -2
+  lineHeight: 36,      // was 42
+  textAlign: 'center',
+},
   subtext: {
     fontFamily: 'Georgia',
     fontStyle: 'italic',
