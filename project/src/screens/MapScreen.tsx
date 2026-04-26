@@ -29,6 +29,7 @@ import NearbyUserMarkers from '../components/NearbyUserMarkers';
 import HeartReceivedScreen from './HeartReceivedScreen';
 import CatchScreen from './CatchScreen';
 import ProfileScreen from './ProfileScreen';
+import ActivityScreen from './ActivityScreen';
 import NearbyTracker from '../components/NearbyTracker';
 import StatusMessageButton from '../components/StatusMessageButton';
 import DirectionArrow from '../components/DirectionArrow';
@@ -85,6 +86,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
   const [showLeaveNote, setShowLeaveNote] = useState(false);
   const [showNearby, setShowNearby] = useState(false);
   const [locationName, setLocationName] = useState('');
+  const [showActivityScreen, setShowActivityScreen] = useState(false);
 
   // ── Location ──
   const { coords, error } = useUserLocation();
@@ -396,7 +398,16 @@ export default function MapScreen({ userId }: MapScreenProps) {
           fromUserId={pendingMatch.fromUserId}
           expiresAt={pendingMatch.expiresAt}
           onClose={dismissMatch}
+          onAccept={() => {
+            dismissMatch();
+            setShowActivityScreen(true);
+          }}
         />
+      )}
+
+      {/* Activity Screen */}
+      {showActivityScreen && (
+        <ActivityScreen onClose={() => setShowActivityScreen(false)} />
       )}
     </View>
   );

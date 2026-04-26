@@ -34,6 +34,8 @@ interface HeartReceivedScreenProps {
   expiresAt: number;
   /** Called to dismiss this screen */
   onClose: () => void;
+  /** Called when the user accepts the heart */
+  onAccept?: () => void;
 }
 
 /**
@@ -48,6 +50,7 @@ export default function HeartReceivedScreen({
   fromUserId,
   expiresAt,
   onClose,
+  onAccept,
 }: HeartReceivedScreenProps) {
   const { profile: senderProfile } = useProfile(fromUserId);
   const [timeLeft, setTimeLeft] = useState(() =>
@@ -86,7 +89,11 @@ export default function HeartReceivedScreen({
     } catch (err) {
       console.warn('[HeartReceivedScreen] Failed to accept match:', err);
     }
-    onClose();
+    if (onAccept) {
+      onAccept();
+    } else {
+      onClose();
+    }
   };
 
   const minutes = Math.floor(timeLeft / 60);
