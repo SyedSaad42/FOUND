@@ -6,19 +6,25 @@ import {
   onSnapshot,
   type Timestamp,
 } from 'firebase/firestore';
-import * as Notifications from 'expo-notifications';
 import { db } from '../config/firebase';
 
-// Configure how notifications appear when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Lazy-load expo-notifications to avoid crash when native module is missing (Expo Go)
+let Notifications: typeof import('expo-notifications') | null = null;
+try {
+  Notifications = require('expo-notifications');
+  Notifications!.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch (e) {
+  console.warn('[MatchNotifications] Notifications not available:', e);
+  Notifications = null;
+}
 
 export interface MatchNotification {
   matchId: string;
@@ -68,17 +74,23 @@ export function useMatchNotifications(currentUserId: string | null) {
 
             const createdAt = data.createdAt as Timestamp | null;
 
-            // Fire a local push notification
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: '💕 Found',
-                body: 'Someone winked at you! Find the culprit!',
-                sound: true,
-              },
-              trigger: null, // immediately
-            }).catch((err) =>
-              console.warn('[MatchNotifications] Notification error:', err),
-            );
+            // Fire a local push notification (skip if native module unavailable)
+            if (Notifications) {
+              try {
+                Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: '💕 Found',
+                    body: 'Someone winked at you! Find the culprit!',
+                    sound: true,
+                  },
+                  trigger: null, // immediately
+                }).catch((err) =>
+                  console.warn('[MatchNotifications] Notification error:', err),
+                );
+              } catch (e) {
+                // Expo Go — no native push support
+              }
+            }
 
             setPendingMatch({
               matchId,

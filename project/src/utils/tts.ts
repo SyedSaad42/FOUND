@@ -1,5 +1,12 @@
-import * as FileSystem from 'expo-file-system';
-import { Audio } from 'expo-av';
+// Lazy-load native modules to avoid crash in Expo Go
+let FileSystem: typeof import('expo-file-system') | null = null;
+let Audio: typeof import('expo-av').Audio | null = null;
+try {
+  FileSystem = require('expo-file-system');
+  Audio = require('expo-av').Audio;
+} catch (e) {
+  console.warn('[tts] Native audio modules not available:', e);
+}
 
 const ELEVENLABS_API_KEY = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY ?? '';
 const VOICE_ID = "pNInz6obpgDQGcFmaJgB"; // Adam (Global Premade)
@@ -9,6 +16,10 @@ const VOICE_ID = "pNInz6obpgDQGcFmaJgB"; // Adam (Global Premade)
  */
 export async function playMessageInVoice(text: string) {
   if (!text.trim()) return;
+  if (!FileSystem || !Audio) {
+    console.warn('[tts] Skipping — native modules unavailable');
+    return;
+  }
 
   try {
     const response = await fetch(
@@ -41,13 +52,13 @@ export async function playMessageInVoice(text: string) {
     return new Promise<void>((resolve, reject) => {
       reader.onload = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
-        const fileUri = `${FileSystem.cacheDirectory}message_voice.mp3`;
+        const fileUri = `${FileSystem!.cacheDirectory}message_voice.mp3`;
 
-        await FileSystem.writeAsStringAsync(fileUri, base64Audio, {
-          encoding: FileSystem.EncodingType.Base64,
+        await FileSystem!.writeAsStringAsync(fileUri, base64Audio, {
+          encoding: FileSystem!.EncodingType.Base64,
         });
 
-        const { sound } = await Audio.Sound.createAsync(
+        const { sound } = await Audio!.Sound.createAsync(
           { uri: fileUri },
           { shouldPlay: true }
         );
