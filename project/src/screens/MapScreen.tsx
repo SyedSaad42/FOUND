@@ -20,6 +20,7 @@ import { useBroadcastLocation } from '../hooks/useBroadcastLocation';
 import { useNearbyUsers } from '../hooks/useNearbyUsers';
 import { useMatchNotifications } from '../hooks/useMatchNotifications';
 import { useProfile } from '../hooks/useProfile';
+import { useAutoPlayNearbyStatus } from '../hooks/useAutoPlayNearbyStatus';
 import { haversineDistance } from '../utils/geo';
 
 import RadiusCircle from '../components/RadiusCircle';
@@ -85,6 +86,9 @@ export default function MapScreen({ userId }: MapScreenProps) {
   // ── Firebase hooks ──
   useBroadcastLocation(userId, coords, statusMessage, profile.avatar);
   const allOnlineUsers = useNearbyUsers(userId);
+
+  // ── Auto-play TTS when a nearby user's status changes ──
+  useAutoPlayNearbyStatus(allOnlineUsers);
 
   // ── Compute Distances & Filter ──
   const { interactionUsers, trackerUsers } = useMemo(() => {
