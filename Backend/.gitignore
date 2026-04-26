@@ -1,2 +1,4 @@
 .env
 api/vision_api.json
+api/*.json
+*.json
