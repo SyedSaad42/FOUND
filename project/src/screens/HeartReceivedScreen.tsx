@@ -90,7 +90,7 @@ export default function HeartReceivedScreen({
 
       {/* Title */}
       <Text style={styles.title}>
-        {senderProfile.name || 'Someone'} just{'\n'}winked at you! 😉
+        {senderProfile.name || 'Someone'} winked at you!
       </Text>
 
       {/* Avatar + heart combo */}
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   timer: {
-    fontFamily: 'InstrumentSans',
+    fontFamily: 'InstrumentSans-Regular',
     color: 'rgba(255,255,255,0.5)',
     fontSize: 16,
     marginBottom: 40,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   acceptText: {
-    fontFamily: 'InstrumentSans-Medium',   // ✅ changed
+    fontFamily: 'InstrumentSans-Regular',   // ✅ changed
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '500',

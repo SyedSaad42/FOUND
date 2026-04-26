@@ -256,7 +256,7 @@ export default function CatchScreen({ targetUserId, targetAvatar, currentUserId,
     return (
       <View style={sentStyles.overlay}>
         <Text style={sentStyles.title}>
-          You just sent a{'\n'}heart to {targetProfile.name || 'Player'}!
+          You winked at{'\n'}{targetProfile.name || 'Player'}!
         </Text>
         <Image source={heartImg} style={sentStyles.heartImage} />
         <Text style={sentStyles.timerText}>
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   distanceText: {
-    fontFamily: 'InstrumentSerif',
+    fontFamily: 'InstrumentSans-Regular',
     color: '#ffffff',
     fontSize: 15,
   },
@@ -506,23 +506,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   pillText: {
-    fontFamily: 'InstrumentSerif',
+    fontFamily: 'InstrumentSans-Regular',
     color: '#ffffff',
     fontSize: 14,
   },
   circleTopRight: {
     position: 'absolute',
-    top: -120,
-    right: -100,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
+    bottom: -180,
+    right: -180,
+    width: 350,
+    height: 350,
+    borderRadius: 175,
     backgroundColor: 'rgba(255, 247, 236, 0.3)',
   },
   circleBottomLeft: {
     position: 'absolute',
-    bottom: -140,
-    left: -120,
+    bottom: -180,
+    left: -180,
     width: 350,
     height: 350,
     borderRadius: 175,
@@ -536,16 +536,16 @@ const styles = StyleSheet.create({
 const sentStyles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#C0392B',
+    backgroundColor: '#BD2C3D',
     zIndex: 100,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
   },
   title: {
+    fontFamily: 'Unbounded-SemiBold',
     color: '#ffffff',
     fontSize: 30,
-    fontWeight: '800',
     textAlign: 'center',
     lineHeight: 40,
     marginBottom: 30,
@@ -557,6 +557,7 @@ const sentStyles = StyleSheet.create({
     marginBottom: 30,
   },
   timerText: {
+    fontFamily: 'Unbounded-SemiBold',
     color: '#ffffff',
     fontSize: 20,
     fontWeight: '600',
@@ -575,6 +576,7 @@ const sentStyles = StyleSheet.create({
     alignItems: 'center',
   },
   backOutText: {
+    fontFamily: 'Unbounded-SemiBold',
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',

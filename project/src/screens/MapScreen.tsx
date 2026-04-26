@@ -273,7 +273,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
       <View style={styles.mapOverlay} pointerEvents="none" />
 
       {/* Top location tab */}
-      {!!locationName && (
+      {!!locationName && !selectedUserId && !showActivityScreen && !pendingMatch && (
         <View style={styles.locationTab}>
           <Text style={styles.locationPin}>📍</Text>
           <Text style={styles.locationText} numberOfLines={2}>
@@ -282,8 +282,8 @@ export default function MapScreen({ userId }: MapScreenProps) {
         </View>
       )}
 
-      {/* Bottom Bar */}
-      <View style={styles.bottomBar}>
+      {/* Bottom Bar — hidden when CatchScreen is open */}
+      {!selectedUserId && !showActivityScreen && !pendingMatch && <View style={styles.bottomBar}>
         {/* Left: Profile — avatar stacked above name row */}
         <TouchableOpacity
           style={styles.bottomProfile}
@@ -338,7 +338,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
             <Text style={styles.bottomActionLabel}>Note</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View>}
 
       {/* Nearby Tracker (for users 50m - 1km away) */}
       <NearbyTracker
