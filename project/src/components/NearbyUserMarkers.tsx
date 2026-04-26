@@ -35,7 +35,7 @@ export default function NearbyUserMarkers({ users, onUserPress }: NearbyUserMark
 
   const handlePress = (user: NearbyUser) => {
     if (user.status) {
-      playMessageInVoice(user.status);
+      playMessageInVoice(user.status, user.avatar);
     }
     onUserPress?.(user.userId);
   };

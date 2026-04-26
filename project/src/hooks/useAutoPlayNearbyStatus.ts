@@ -29,7 +29,7 @@ export function useAutoPlayNearbyStatus(interactionUsers: NearbyUser[]) {
 
       // Queue playback so messages don't overlap
       queueRef.current = queueRef.current.then(() =>
-        playMessageInVoice(user.status!).catch(() => {}),
+        playMessageInVoice(user.status!, user.avatar).catch(() => {}),
       );
     });
 

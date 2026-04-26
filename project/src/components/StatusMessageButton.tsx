@@ -18,6 +18,7 @@ interface StatusMessageButtonProps {
   onMessageChange: (message: string) => void;
   visible: boolean;
   onClose: () => void;
+  avatar?: string;
 }
 
 /**
@@ -29,6 +30,7 @@ export default function StatusMessageButton({
   onMessageChange,
   visible,
   onClose,
+  avatar,
 }: StatusMessageButtonProps) {
   const [draft, setDraft] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -49,7 +51,7 @@ export default function StatusMessageButton({
 
     if (message) {
       setIsSpeaking(true);
-      await playMessageInVoice(message);
+      await playMessageInVoice(message, avatar);
       setIsSpeaking(false);
     }
   };

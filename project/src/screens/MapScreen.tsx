@@ -354,6 +354,7 @@ export default function MapScreen({ userId }: MapScreenProps) {
         onMessageChange={setStatusMessage}
         visible={showLeaveNote}
         onClose={() => setShowLeaveNote(false)}
+        avatar={profile.avatar}
       />
 
       {/* Directional Arrow (when tracking someone) */}
