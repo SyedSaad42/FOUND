@@ -17,8 +17,8 @@ export default function WelcomeScreen({ onStart }: WelcomeScreenProps) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Found</Text>
-        <Text style={styles.subtitle}>Catch to match!</Text>
+        <Text style={styles.title}>Wink!</Text>
+        <Text style={styles.subtitle}>Catch to match</Text>
 
         <View style={styles.heartWrapper}>
           <Image source={heartIcon} style={styles.heartImage} />
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   subtitle: {
-    fontFamily: 'InstrumentSerif',
+    fontFamily: 'Unbounded-Medium',      // ✅ changed from InstrumentSerif
     fontSize: 22,
     color: '#C0392B',
     letterSpacing: 0.3,
@@ -87,10 +87,10 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   startBtnText: {
-    fontFamily: 'Unbounded',
+    fontFamily: 'InstrumentSans-SemiBold', // ✅ changed from Unbounded
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '400',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
 });

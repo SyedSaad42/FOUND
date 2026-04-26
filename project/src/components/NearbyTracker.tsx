@@ -15,27 +15,14 @@ const { height: SCREEN_H } = Dimensions.get('window');
 const PANEL_HEIGHT = SCREEN_H * 0.45;
 
 interface NearbyTrackerProps {
-  /** Users outside the interaction radius but within 1km */
   users: Array<NearbyUser & { distance: number }>;
-  /** Current user's latitude */
   userLat: number;
-  /** Current user's longitude */
   userLng: number;
-  /** Called when the user selects someone to track */
   onTrackUser: (userId: string) => void;
-  /** Whether the panel is visible */
   visible: boolean;
-  /** Called to close the panel */
   onClose: () => void;
 }
 
-/**
- * Pokemon Go-style "Nearby" tracker bar.
- *
- * - Collapsed: Small pill in bottom-right with count
- * - Expanded: Slide-up panel listing users with distance + direction
- * - Tapping a user starts directional tracking
- */
 export default function NearbyTracker({
   users,
   userLat,
@@ -46,7 +33,6 @@ export default function NearbyTracker({
 }: NearbyTrackerProps) {
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Animate panel in/out based on visible prop
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: visible ? 1 : 0,
@@ -66,12 +52,10 @@ export default function NearbyTracker({
     outputRange: [PANEL_HEIGHT, 0],
   });
 
-  // Sort by distance (closest first)
   const sorted = [...users].sort((a, b) => a.distance - b.distance);
 
   return (
     <>
-      {/* ── Expanded panel (slide-up) ── */}
       <Animated.View
         style={[
           styles.panel,
@@ -99,9 +83,9 @@ export default function NearbyTracker({
             </View>
           ) : (
             sorted.map((user) => {
-              const bearing = calcBearing(userLat, userLng, user.lat, user.lng);
+              const bearing  = calcBearing(userLat, userLng, user.lat, user.lng);
               const cardinal = bearingToCardinal(bearing);
-              const dist = formatDistance(user.distance);
+              const dist     = formatDistance(user.distance);
 
               return (
                 <TouchableOpacity
@@ -110,20 +94,13 @@ export default function NearbyTracker({
                   onPress={() => handleUserPress(user.userId)}
                   activeOpacity={0.7}
                 >
-                  {/* Avatar */}
                   <View style={styles.userAvatar}>
                     <Text style={styles.userAvatarEmoji}>🔥</Text>
                   </View>
-
-                  {/* Info */}
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>Player</Text>
-                    <Text style={styles.userMeta}>
-                      {dist} · {cardinal}
-                    </Text>
+                    <Text style={styles.userMeta}>{dist} · {cardinal}</Text>
                   </View>
-
-                  {/* Direction arrow */}
                   <View style={styles.userArrow}>
                     <Text style={styles.arrowText}>→</Text>
                   </View>
@@ -134,7 +111,6 @@ export default function NearbyTracker({
         </ScrollView>
       </Animated.View>
 
-      {/* ── Backdrop when expanded ── */}
       {visible && (
         <TouchableOpacity
           style={styles.backdrop}
@@ -147,27 +123,26 @@ export default function NearbyTracker({
 }
 
 const styles = StyleSheet.create({
-  // ── Backdrop ──
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
     zIndex: 39,
   },
 
-  // ── Expanded panel ──
   panel: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     height: PANEL_HEIGHT,
-    backgroundColor: 'rgba(14, 14, 30, 0.97)',
+    backgroundColor: '#301F1A',           // ✅ changed from rgba(14,14,30,0.97)
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     zIndex: 40,
     borderTopWidth: 1.5,
-    borderColor: 'rgba(255, 64, 129, 0.3)',
+    borderColor: 'rgba(189, 44, 61, 0.3)', // ✅ matched to app crimson
   },
+
   panelHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -189,9 +164,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   panelTitle: {
+    fontFamily: 'Unbounded-Regular',       // ✅ changed
     color: '#ffffff',
     fontSize: 17,
-    fontWeight: '700',
     letterSpacing: 0.5,
   },
   panelClose: {
@@ -201,7 +176,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // ── User list ──
   userList: {
     flex: 1,
     paddingHorizontal: 16,
@@ -219,11 +193,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 64, 129, 0.15)',
+    backgroundColor: 'rgba(189, 44, 61, 0.15)',  // ✅ matched to crimson
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 64, 129, 0.3)',
+    borderColor: 'rgba(189, 44, 61, 0.3)',        // ✅ matched to crimson
   },
   userAvatarEmoji: {
     fontSize: 22,
@@ -246,17 +220,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 64, 129, 0.15)',
+    backgroundColor: 'rgba(189, 44, 61, 0.15)',  // ✅ matched to crimson
     alignItems: 'center',
     justifyContent: 'center',
   },
   arrowText: {
-    color: '#ff4081',
+    color: '#BD2C3D',                             // ✅ matched to crimson
     fontSize: 16,
     fontWeight: '700',
   },
 
-  // ── Empty state ──
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -267,13 +240,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emptyText: {
+    fontFamily: 'Unbounded-Regular',              // ✅ changed
     color: 'rgba(255,255,255,0.6)',
     fontSize: 16,
-    fontWeight: '600',
   },
   emptyHint: {
+    fontFamily: 'InstrumentSans',                 // ✅ changed
     color: 'rgba(255,255,255,0.3)',
     fontSize: 13,
     marginTop: 6,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });

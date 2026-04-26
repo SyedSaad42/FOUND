@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   locationText: {
-    fontFamily: 'InstrumentSerif',
+    fontFamily: 'InstrumentSans-Regular',
     color: '#ffffff',
     fontSize: 13,
     flexShrink: 1,

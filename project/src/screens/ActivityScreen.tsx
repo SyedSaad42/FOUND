@@ -14,23 +14,14 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import {
-  Camera,
-  useCameraDevices,
-  useCameraPermission,
-  useMicrophonePermission,
-} from 'react-native-vision-camera';
+import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
-// ─── Config ───────────────────────────────────────────────────────────
-// Replace with your machine's LAN IP when running FastAPI locally.
-// Example: 'http://192.168.1.42:8000'
 const API_BASE = 'http://10.85.93.109:8000';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// ─── Brand Tokens ─────────────────────────────────────────────────────
 const C = {
   crimson:  '#BD2C3D',
   blush:    '#E2817B',
@@ -40,7 +31,7 @@ const C = {
 };
 
 // ─────────────────────────────────────────────────────────────────────
-//  SHARED DECORATIVE COMPONENTS
+//  DECORATIVE COMPONENTS
 // ─────────────────────────────────────────────────────────────────────
 
 function FloatingHeart({ delay, x, size }: { delay: number; x: number; size: number }) {
@@ -194,24 +185,21 @@ function ResponseCard({ message, onBack }: { message: string; onBack: () => void
   return (
     <Animated.View style={[styles.responseCard, { opacity, transform: [{ translateY: slideY }] }]}>
       <View style={styles.responseCardLine} />
-
       <View style={styles.responseHeader}>
         <View style={styles.responseAvatar}>
           <Text style={styles.avatarEmoji}>{'🔮'}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.responseName}>{'Gemma'}</Text>
-          <Text style={styles.responseTitle}>{'Love Guru · Dare Found'}</Text>
+          <Text style={styles.responseTitle}>{'Love Guru · Wink Found'}</Text>
         </View>
         <View style={styles.liveBadge}>
           <View style={styles.liveDot} />
           <Text style={styles.liveText}>{'LIVE'}</Text>
         </View>
       </View>
-
       <Text style={styles.responseText}>{message}</Text>
       <Text style={styles.responseTimestamp}>{'Just now · ♥ Generated for you'}</Text>
-
       <TouchableOpacity onPress={onBack} style={styles.ghostBtn} activeOpacity={0.7}>
         <Text style={styles.ghostBtnText}>{'← Try again'}</Text>
       </TouchableOpacity>
@@ -244,7 +232,9 @@ function ErrorCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  CAMERA OVERLAY
+//  CAMERA OVERLAY — uses expo-camera CameraView
+//  Permissions are requested here, inline, so the camera screen opens
+//  immediately without blocking the main "Ask Gemma" button.
 // ─────────────────────────────────────────────────────────────────────
 
 function CameraOverlay({
@@ -254,23 +244,31 @@ function CameraOverlay({
   onStop: (videoPath: string) => void;
   onCancel: () => void;
 }) {
-  const devices = useCameraDevices();
-  const device = devices?.[0] ?? null;
-  const cameraRef = useRef<any>(null);
+  const [camPermission,  requestCamPermission]  = useCameraPermissions();
+  const [micPermission,  requestMicPermission]  = useMicrophonePermissions();
 
-  const [isReady,    setIsReady]    = useState(false);
-  const [recording,  setRecording]  = useState(false);
-  const [elapsed,    setElapsed]    = useState(0);
+  const cameraRef = useRef<CameraView>(null);
+
+  const [recording, setRecording] = useState(false);
+  const [elapsed,   setElapsed]   = useState(0);
+  const [ready,     setReady]     = useState(false);
 
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeIn    = useRef(new Animated.Value(0)).current;
 
+  // Request permissions only if they haven't been decided yet.
+  // If already granted OR already denied, skip the dialog entirely.
   useEffect(() => {
-    // Fade in camera view
-    Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+    (async () => {
+      if (camPermission?.status === 'undetermined') await requestCamPermission();
+      if (micPermission?.status === 'undetermined') await requestMicPermission();
+      setReady(true);
+    })();
+  }, []);
 
-    // Pulse recording dot
+  useEffect(() => {
+    Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }).start();
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 0.2, duration: 700, useNativeDriver: true }),
@@ -279,14 +277,14 @@ function CameraOverlay({
     ).start();
   }, []);
 
+  // Auto-start recording once camera is ready and permissions granted
   useEffect(() => {
-    if (device && !recording) {
-      setIsReady(true);
-      const timeout = setTimeout(startRecording, 800);
-      return () => clearTimeout(timeout);
+    if (ready && camPermission?.granted && !recording) {
+      const t = setTimeout(startRecording, 800);
+      return () => clearTimeout(t);
     }
     return undefined;
-  }, [device]);
+  }, [ready, camPermission?.granted]);
 
   const startRecording = async () => {
     if (!cameraRef.current || recording) return;
@@ -294,61 +292,70 @@ function CameraOverlay({
     setElapsed(0);
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
 
-    cameraRef.current.startRecording({
-      onRecordingFinished: (video: { path: string }) => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        onStop(video.path);
-      },
-      onRecordingError: (err: { message: string }) => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        Alert.alert('Recording failed', err.message);
+    try {
+      const video = await cameraRef.current.recordAsync();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (video?.uri) onStop(video.uri);
+    } catch (err: any) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      // Ignore "recording stopped" errors that fire on manual stop
+      if (!err?.message?.includes('stopped')) {
+        Alert.alert('Recording failed', err?.message ?? 'Unknown error');
         onCancel();
-      },
-    });
+      }
+    }
   };
 
   const stopRecording = async () => {
     if (!cameraRef.current || !recording) return;
     setRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
-    await cameraRef.current.stopRecording();
+    cameraRef.current.stopRecording();
   };
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  if (!device) {
+  // Permissions denied state
+  if (ready && !camPermission?.granted) {
+    return (
+      <View style={camStyles.container}>
+        <Text style={[camStyles.waitText, { textAlign: 'center', paddingHorizontal: 32 }]}>
+          {'Camera access is required.\nPlease enable it in Settings and try again.'}
+        </Text>
+        <TouchableOpacity onPress={onCancel} style={[styles.meetBtn, { marginTop: 24 }]} activeOpacity={0.85}>
+          <Text style={styles.meetBtnText}>{'← Go Back'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Waiting for permissions
+  if (!ready || !camPermission?.granted) {
     return (
       <View style={camStyles.container}>
         <ActivityIndicator color={C.cream} size="large" />
-        <Text style={camStyles.waitText}>{'Finding camera…'}</Text>
+        <Text style={camStyles.waitText}>{'Requesting access…'}</Text>
       </View>
     );
   }
 
   return (
     <Animated.View style={[camStyles.container, { opacity: fadeIn }]}>
-      <Camera
+      <CameraView
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={true}
-       
-        
+        facing={'back' as CameraType}
+        mode="video"
       />
 
-      {/* Vignette overlay */}
-      <View style={camStyles.vignette} pointerEvents="none" />
-
-      {/* Top HUD */}
       <View style={camStyles.hud}>
-        {recording && (
+        {recording ? (
           <View style={camStyles.recPill}>
             <Animated.View style={[camStyles.recDot, { opacity: pulseAnim }]} />
             <Text style={camStyles.recTime}>{fmt(elapsed)}</Text>
           </View>
-        )}
-        {!recording && isReady && (
+        ) : (
           <View style={camStyles.recPill}>
             <ActivityIndicator size="small" color={C.cream} />
             <Text style={[camStyles.recTime, { marginLeft: 8 }]}>{'Starting…'}</Text>
@@ -356,19 +363,14 @@ function CameraOverlay({
         )}
       </View>
 
-      {/* Hint text */}
       <View style={camStyles.hintRow} pointerEvents="none">
-        <Text style={camStyles.hintText}>
-          {'Gemma is watching your vibe ♥'}
-        </Text>
+        <Text style={camStyles.hintText}>{'Gemma is watching your vibe ♥'}</Text>
       </View>
 
-      {/* Bottom Controls */}
       <View style={camStyles.controls}>
         <TouchableOpacity onPress={onCancel} style={camStyles.cancelBtn} activeOpacity={0.7}>
           <Text style={camStyles.cancelText}>{'✕  Cancel'}</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           onPress={stopRecording}
           disabled={!recording}
@@ -388,7 +390,7 @@ function CameraOverlay({
 // ─────────────────────────────────────────────────────────────────────
 
 function ProcessingScreen({ status }: { status: string }) {
-  const spin = useRef(new Animated.Value(0)).current;
+  const spin       = useRef(new Animated.Value(0)).current;
   const pulseScale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
@@ -430,10 +432,6 @@ export default function MeetGemmaPage({ onClose }: { onClose?: () => void } = {}
   const [errorMsg,      setErrorMsg]      = useState('');
   const [processStatus, setProcessStatus] = useState('Extracting frames…');
 
-  const { hasPermission: hasCam,  requestPermission: requestCam  } = useCameraPermission();
-  const { hasPermission: hasMic,  requestPermission: requestMic  } = useMicrophonePermission();
-
-  // Entrance animations
   const labelOp    = useRef(new Animated.Value(0)).current;
   const headlineY  = useRef(new Animated.Value(28)).current;
   const headlineOp = useRef(new Animated.Value(0)).current;
@@ -461,126 +459,109 @@ export default function MeetGemmaPage({ onClose }: { onClose?: () => void } = {}
     ]).start();
   }, []);
 
-  // ── Button press → request permissions → open camera ────────────
-  const handleMeetGemma = async () => {
+  // ── No permission gate here — camera screen handles its own permissions ──
+  const handleMeetGemma = () => {
     Animated.sequence([
       Animated.spring(pressScale, { toValue: 0.94, useNativeDriver: true, tension: 300, friction: 10 }),
       Animated.spring(pressScale, { toValue: 1,    useNativeDriver: true }),
     ]).start();
-
-    if (!hasCam) {
-      const granted = await requestCam();
-      if (!granted) {
-        Alert.alert('Camera needed', 'Allow camera access so Gemma can see your vibe.');
-        return;
-      }
-    }
-    if (!hasMic) {
-      // Request mic even though we don't record audio — VisionCamera requires it
-      await requestMic();
-    }
-
     setAppState('camera');
   };
 
-  // ── Video ready → extract frames → POST to FastAPI → stream dare ─
-const handleVideoReady = async (videoPath: string) => {
-  setAppState('processing');
-  setDare('');
-  setErrorMsg('');
+  // ── Video ready → extract frames → POST to API ───────────────────
+  const handleVideoReady = async (videoPath: string) => {
+    setAppState('processing');
+    setDare('');
+    setErrorMsg('');
 
-  try {
-    const normalizedPath = videoPath.startsWith('file://')
-      ? videoPath
-      : `file://${videoPath}`;
+    try {
+      const normalizedPath = videoPath.startsWith('file://')
+        ? videoPath
+        : `file://${videoPath}`;
 
-    setProcessStatus('Extracting frames…');
-    const timestamps = [500, 1000, 2000, 3000, 4000, 5000, 6000, 7000];
-    const frames: string[] = [];
+      setProcessStatus('Extracting frames…');
+      const timestamps = [500, 1000, 2000, 3000, 4000, 5000, 6000, 7000];
+      const frames: string[] = [];
 
-    for (let i = 0; i < timestamps.length; i++) {
-      try {
-        const result = await VideoThumbnails.getThumbnailAsync(normalizedPath, {
-          time: timestamps[i],
-          quality: 0.7,
-        });
-        const uri = result?.uri ?? null;
-        if (uri) {
-          const b64 = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
+      for (let i = 0; i < timestamps.length; i++) {
+        try {
+          const result = await VideoThumbnails.getThumbnailAsync(normalizedPath, {
+            time: timestamps[i],
+            quality: 0.7,
           });
-          if (b64 && b64.length > 0) {
-            frames.push(b64);
-            console.log(`Frame ${i} captured, length: ${b64.length}`);
+          const uri = result?.uri ?? null;
+          if (uri) {
+            const b64 = await FileSystem.readAsStringAsync(uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            if (b64 && b64.length > 0) {
+              frames.push(b64);
+              console.log(`Frame ${i} captured, length: ${b64.length}`);
+            }
           }
+        } catch (err) {
+          console.warn(`Frame ${i} failed:`, err);
         }
-      } catch (err) {
-        console.warn(`Frame ${i} failed:`, err);
       }
-    }
 
-    if (frames.length === 0) {
-      throw new Error('Could not extract any frames from video.');
-    }
-
-    console.log(`Sending ${frames.length} frames to API...`);
-    setProcessStatus('Asking Gemma…');
-
-    const response = await fetch(`${API_BASE}/analyze-frames`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ frames, context: '' }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`Server ${response.status}: ${body || response.statusText}`);
-    }
-
-    // React Native doesn't support response.body.getReader()
-    // so we read the full SSE response as text at once
-    const fullText = await response.text();
-    console.log('Full response received, length:', fullText.length);
-
-    let accumulated = '';
-
-    for (const line of fullText.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-
-      const payload = trimmed.slice(5).trim();
-      if (payload === '[DONE]') break;
-      if (!payload) continue;
-
-      try {
-        const parsed = JSON.parse(payload);
-
-        if (parsed.error) {
-          throw new Error(parsed.error);
-        }
-
-        if (parsed.text) {
-          accumulated += parsed.text;
-        }
-      } catch (parseErr) {
-        console.warn('Parse error on line:', trimmed, parseErr);
+      if (frames.length === 0) {
+        throw new Error('Could not extract any frames from video.');
       }
+
+      console.log(`Sending ${frames.length} frames to API...`);
+      setProcessStatus('Asking Gemma…');
+
+      const response = await fetch(`${API_BASE}/analyze-frames`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ frames, context: '' }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Server ${response.status}: ${body || response.statusText}`);
+      }
+
+      const fullText = await response.text();
+      console.log('Full response received, length:', fullText.length);
+
+      let accumulated = '';
+
+      for (const line of fullText.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') break;
+        if (!payload) continue;
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          console.warn('JSON parse error on line:', trimmed);
+          continue;
+        }
+
+        if (parsed.error) throw new Error(parsed.error);
+        if (parsed.text) accumulated += parsed.text;
+      }
+
+      if (accumulated.length === 0) {
+        throw new Error('No response received from Gemma.');
+      }
+
+      console.log('Dare generated:', accumulated);
+      setDare(accumulated);
+      setAppState('success');
+
+    } catch (err: any) {
+      console.error('[MeetGemma]', err);
+      setErrorMsg(err?.message ?? 'Something went wrong generating your dare.');
+      setAppState('error');
     }
+  };
 
-    if (accumulated.length === 0) {
-      throw new Error('No response received from Gemma.');
-    }
-
-    console.log('Dare generated:', accumulated);
-    setDare(accumulated);
-    setAppState('success');
-
-  } catch (err: any) {
-    console.error('[MeetGemma]', err);
-    setErrorMsg(err?.message ?? 'Something went wrong generating your dare.');
-    setAppState('error');
-  }
-};
   const handleReset = () => {
     setAppState('idle');
     setDare('');
@@ -588,7 +569,6 @@ const handleVideoReady = async (videoPath: string) => {
     setProcessStatus('Extracting frames…');
   };
 
-  // ── Heart config ────────────────────────────────────────────────
   const hearts = [
     { delay: 0,    x: W * 0.07, size: 18 },
     { delay: 1400, x: W * 0.18, size: 11 },
@@ -599,32 +579,20 @@ const handleVideoReady = async (videoPath: string) => {
     { delay: 300,  x: W * 0.92, size: 10 },
   ];
 
-  // ── Full-screen states ──────────────────────────────────────────
   if (appState === 'camera') {
-    return (
-      <CameraOverlay
-        onStop={handleVideoReady}
-        onCancel={handleReset}
-      />
-    );
+    return <CameraOverlay onStop={handleVideoReady} onCancel={handleReset} />;
   }
 
   if (appState === 'processing') {
     return <ProcessingScreen status={processStatus} />;
   }
 
-  // ── Main landing + result states ────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={C.espresso} />
 
-      {/* Close button */}
       {onClose && (
-        <TouchableOpacity
-          onPress={onClose}
-          style={styles.closeBtn}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
       )}
@@ -639,15 +607,12 @@ const handleVideoReady = async (videoPath: string) => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Label */}
         <Animated.Text style={[styles.label, { opacity: labelOp }]}>
           {'Ready?'}
         </Animated.Text>
 
-        {/* Divider */}
         <Animated.View style={[styles.divider, { opacity: labelOp }]} />
 
-        {/* Headline */}
         <Animated.View style={{ opacity: headlineOp, transform: [{ translateY: headlineY }], marginBottom: 18 }}>
           <Text style={styles.headline}>
             {'Your heart is '}
@@ -655,30 +620,22 @@ const handleVideoReady = async (videoPath: string) => {
           </Text>
         </Animated.View>
 
-        {/* Subtext */}
         <Animated.Text style={[styles.subtext, { opacity: subOp, transform: [{ translateY: subY }] }]}>
           {'Gemma reads your vibe and crafts a dare just for you.'}
         </Animated.Text>
 
-        {/* Idle — CTA button */}
         {appState === 'idle' && (
           <Animated.View style={{ opacity: btnOp, transform: [{ scale: Animated.multiply(btnScale, pressScale) }] }}>
-            <TouchableOpacity
-              onPress={handleMeetGemma}
-              activeOpacity={1}
-              style={styles.meetBtn}
-            >
+            <TouchableOpacity onPress={handleMeetGemma} activeOpacity={1} style={styles.meetBtn}>
               <Text style={styles.meetBtnText}>{'Ask Gemma ♥'}</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
 
-        {/* Success — dare card */}
         {appState === 'success' && dare.length > 0 && (
           <ResponseCard message={dare} onBack={handleReset} />
         )}
 
-        {/* Error */}
         {appState === 'error' && (
           <ErrorCard
             message={errorMsg}
@@ -688,7 +645,7 @@ const handleVideoReady = async (videoPath: string) => {
         )}
       </ScrollView>
 
-      <Text style={styles.footer}>{'FOUND · CATCH TO MATCH'}</Text>
+      <Text style={styles.footer}>{'WINK · CATCH TO MATCH'}</Text>
     </SafeAreaView>
   );
 }
@@ -717,11 +674,11 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingHorizontal: 28,
-  paddingTop: 20,
-  paddingBottom: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 20,
+    paddingBottom: 100,
   },
   arcOuter: {
     position: 'absolute',
@@ -760,22 +717,22 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   headline: {
-  fontFamily: 'Unbounded-Black',
-  fontSize: 28,        // was 34
-  fontWeight: '900',
-  color: C.cream,
-  letterSpacing: -1.5, // was -2
-  lineHeight: 36,      // was 42
-  textAlign: 'center',
-},
+    fontFamily: 'Unbounded-Black',
+    fontSize: 28,
+    fontWeight: '900',
+    color: C.cream,
+    letterSpacing: -1.5,
+    lineHeight: 36,
+    textAlign: 'center',
+  },
   subtext: {
     fontFamily: 'Georgia',
     fontStyle: 'italic',
     color: 'rgba(255,247,236,0.5)',
-    fontSize: 16,
-    lineHeight: 26,
+    fontSize: 15,
+    lineHeight: 24,
     textAlign: 'center',
-    marginBottom: 44,
+    marginBottom: 28,
     paddingHorizontal: 8,
   },
   meetBtn: {
@@ -837,8 +794,8 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  avatarEmoji: { fontSize: 22 },
-  responseName: {
+  avatarEmoji:   { fontSize: 22 },
+  responseName:  {
     fontFamily: 'Unbounded-ExtraBold',
     color: C.cream,
     fontSize: 13,
@@ -937,12 +894,8 @@ const camStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-  },
-  vignette: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    // Simulated vignette via nested views in production — keep simple here
-    borderWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hud: {
     position: 'absolute',
@@ -1063,9 +1016,7 @@ const procStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(226,129,123,0.25)',
   },
-  orbEmoji: {
-    fontSize: 52,
-  },
+  orbEmoji: { fontSize: 52 },
   title: {
     fontFamily: 'Unbounded-ExtraBold',
     color: C.cream,
